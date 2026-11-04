@@ -1,0 +1,49 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: var(--font-jakarta), system-ui, sans-serif;
+  --font-display: var(--font-bricolage), var(--font-jakarta), sans-serif;
+
+  --color-ink: #12322a;
+  --color-ink-2: #4c6a62;
+  --color-ink-3: #7c948d;
+  --color-line: #e3eae7;
+  --color-page: #f5f8f6;
+  --color-brand: #0e9f6e;
+  --color-brand-dark: #0b7f58;
+  --color-brand-soft: #e7f6f0;
+  --color-deep: #0c3a2c;
+  --color-sun: #ffb020;
+  --color-sun-soft: #fff4dd;
+  --color-sun-ink: #8a5a00;
+  --color-bad: #c9303e;
+  --color-bad-soft: #fdecee;
+  --color-blue: #2f5fc4;
+  --color-blue-soft: #e9effb;
+  --shadow-card: 0 1px 2px rgba(12, 58, 44, 0.05), 0 8px 24px -18px rgba(12, 58, 44, 0.25);
+}
+
+html, body { height: 100%; }
+body { background: var(--color-page); color: var(--color-ink); font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; font-weight: 700; }
+
+@layer components {
+  .card { background: #fff; border: 1px solid var(--color-line); border-radius: 16px; box-shadow: var(--shadow-card); }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 10px; padding: 9px 15px; font-size: 14px; font-weight: 700; white-space: nowrap; transition: background .15s, border-color .15s, opacity .15s; cursor: pointer; }
+  .btn:disabled { opacity: .55; cursor: not-allowed; }
+  .btn-primary { background: var(--color-brand); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: var(--color-brand-dark); }
+  .btn-ghost { background: #fff; color: var(--color-ink); border: 1px solid var(--color-line); }
+  .btn-ghost:hover:not(:disabled) { border-color: #bcd0c9; background: #fafcfb; }
+  .btn-danger { background: #fff; color: var(--color-bad); border: 1px solid #f3c9ce; }
+  .btn-danger:hover:not(:disabled) { background: var(--color-bad-soft); }
+  .field { width: 100%; background: #fff; border: 1px solid #d3dfda; border-radius: 10px; padding: 10px 13px; font-size: 14px; color: var(--color-ink); outline: none; }
+  .field:focus { border-color: var(--color-brand); box-shadow: 0 0 0 3px rgba(14, 159, 110, .15); }
+  .label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 700; }
+  .hint { margin-top: 5px; font-size: 12.5px; color: var(--color-ink-3); line-height: 1.4; }
+  .th { padding: 11px 16px; text-align: left; font-size: 12px; font-weight: 700; color: var(--color-ink-3); white-space: nowrap; }
+  .td { padding: 12px 16px; font-size: 14px; border-top: 1px solid var(--color-line); }
+  .editor { min-height: 340px; padding: 18px 20px; font-family: Arial, Helvetica, sans-serif; font-size: 15px; line-height: 1.55; color: #1d2a24; outline: none; }
+  .editor ul { list-style: disc; padding-left: 20px; }
+  .editor a { color: var(--color-brand-dark); text-decoration: underline; }
+}
