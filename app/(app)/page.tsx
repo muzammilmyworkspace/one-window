@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { all, getKv, one } from '@/lib/db'
 import { campaignStats, dailySends } from '@/lib/engine'
-import { byListOrder, listLabel } from '@/lib/lists'
 import { batches } from '@/lib/plan'
 import { missingCreds, PROVIDER_LABEL, providers, usedToday } from '@/lib/providers'
 import { Empty, Icon, Meter, Notice, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
@@ -17,11 +16,6 @@ export default async function Dashboard() {
     getKv('webhooks_seen'),
   ])
   const count = (s: string) => contacts.filter((c) => c.status === s).reduce((a, c) => a + Number(c.n), 0)
-  const lists = [...new Set(contacts.map((c) => String(c.list_name)))].map((l) => ({
-    name: l,
-    total: contacts.filter((c) => c.list_name === l).reduce((a, c) => a + Number(c.n), 0),
-    active: Number(contacts.find((c) => c.list_name === l && c.status === 'active')?.n || 0),
-  })).sort((a, b) => byListOrder(a.name, b.name))
   const reached = await one<{ n: number }>('SELECT COUNT(DISTINCT contact_id) n FROM sends WHERE sent_at IS NOT NULL')
   const notYet = Math.max(0, count('active') - Number(reached?.n || 0))
   const total = contacts.reduce((a, c) => a + Number(c.n), 0)
@@ -60,9 +54,9 @@ export default async function Dashboard() {
 
       <section aria-label="Your emails" className="mb-5">
         <h2 className="mb-3 text-base">Your emails</h2>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-          <Stat label="Total emails" value={total} sub={`${count('active').toLocaleString()} can be emailed`} />
-          {lists.map((l) => <Stat key={l.name} label={listLabel(l.name)} value={l.total} sub={`${l.active.toLocaleString()} active`} />)}
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <Stat label="Total emails" value={total} sub="All contacts" />
+          <Stat label="Ready to email" value={count('active')} sub="Not unsubscribed or bounced" />
           <Stat label="Not emailed yet" value={notYet} sub="Still waiting for a first email" />
         </div>
       </section>

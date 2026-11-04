@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { byListOrder, followupFor, listLabel, reasonFor } from '@/lib/lists'
+import { followupFor } from '@/lib/lists'
 import { batches } from '@/lib/plan'
 import SendingPlan from './SendingPlan'
 import { Icon } from './ui'
@@ -26,7 +26,7 @@ export default function CampaignEditor(props: {
   initial: Draft; templates: Template[]; stateCounts: { list: string; state: string; n: number }[]; live: boolean; capacity: number
 }) {
   const router = useRouter()
-  const [d, setD] = useState<Draft>(props.initial)
+  const [d, setD] = useState<Draft>({ ...props.initial, list_name: '' })
   const [html, setHtml] = useState(props.initial.html)
   const [step, setStep] = useState(0)
   const [view, setView] = useState<'preview' | 'edit'>('preview')
@@ -58,16 +58,13 @@ export default function CampaignEditor(props: {
   const sync = () => { if (editor.current) setHtml(editor.current.innerHTML) }
   const cmd = (name: string, value?: string) => { editor.current?.focus(); document.execCommand(name, false, value); sync() }
 
-  const lists = [...new Set(props.stateCounts.map((s) => s.list))].sort(byListOrder)
-  if (!lists.includes(d.list_name)) lists.unshift(d.list_name)
-  const listSize = (l: string) => props.stateCounts.filter((s) => s.list === l).reduce((a, s) => a + s.n, 0)
-  const inList = props.stateCounts.filter((s) => s.list === d.list_name)
-  const total = (d.states.length ? inList.filter((s) => d.states.includes(s.state)) : inList).reduce((a, s) => a + s.n, 0)
+  const byState = new Map<string, number>()
+  for (const c of props.stateCounts) byState.set(c.state, (byState.get(c.state) || 0) + c.n)
+  const states = [...byState].map(([state, n]) => ({ state, n })).sort((x, y) => y.n - x.n)
+  const everyone = states.reduce((a, s) => a + s.n, 0)
+  const total = d.states.length ? states.filter((s) => d.states.includes(s.state)).reduce((a, s) => a + s.n, 0) : everyone
   const plan = batches(total, 0, props.capacity, d.warmup, Date.now())
 
-  function pickList(l: string) {
-    set({ list_name: l, states: [], reason: reasonFor(l), followup_key: d.followup_key ? followupFor(l) : '' })
-  }
   const toggleState = (s: string) => set({ states: d.states.includes(s) ? d.states.filter((x) => x !== s) : [...d.states, s] })
 
   async function upload(f: File) {
@@ -197,21 +194,16 @@ export default function CampaignEditor(props: {
       {step === 1 && (
         <section className="card p-6">
           <h2 className="text-xl">Who gets this email?</h2>
-          <div className="mt-4 grid gap-2">
-            {lists.map((l) => (
-              <button key={l} type="button" aria-pressed={d.list_name === l} onClick={() => pickList(l)}
-                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left ${d.list_name === l ? 'border-brand bg-brand-soft' : 'border-line bg-white hover:border-[#bfc1b8]'}`}>
-                <span className="font-semibold">{listLabel(l)}</span>
-                <span className="tabular-nums text-ink-2">{listSize(l).toLocaleString()}</span>
-              </button>
-            ))}
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-brand bg-brand-soft px-4 py-3">
+            <span className="font-semibold">All contacts</span>
+            <span className="tabular-nums font-semibold">{everyone.toLocaleString()}</span>
           </div>
 
-          {inList.length > 1 && (
+          {states.length > 1 && (
             <div className="mt-4">
               <p className="label">Only some states? <span className="font-normal text-ink-3">Optional</span></p>
               <div className="flex flex-wrap gap-1.5">
-                {inList.map((s) => {
+                {states.map((s) => {
                   const on = d.states.includes(s.state)
                   return (
                     <button key={s.state || 'none'} type="button" aria-pressed={on} onClick={() => toggleState(s.state)}
@@ -241,6 +233,7 @@ export default function CampaignEditor(props: {
           </label>
           <div className="mt-4">
             <p className="label">Sending plan</p>
+            <p className="mb-2 text-[13px] text-ink-2">All {plan.length} {plan.length === 1 ? 'batch is' : 'batches are'} scheduled together when you launch. Nothing else to do.</p>
             <div className="max-h-72 overflow-y-auto"><SendingPlan batches={plan} /></div>
           </div>
         </section>
@@ -310,8 +303,8 @@ export default function CampaignEditor(props: {
           <dl className="mt-4 divide-y divide-line rounded-xl border border-line text-sm">
             {[
               ['Campaign', d.name],
-              ['Recipients', `${audience.toLocaleString()} · ${listLabel(d.list_name)}${d.states.length ? ` · ${d.states.join(', ')}` : ''}`],
-              ['First go', `${(launchPlan[0]?.size || 0).toLocaleString()} today, then ${Math.max(0, launchPlan.length - 1)} more ${launchPlan.length === 2 ? 'batch' : 'batches'}`],
+              ['Recipients', `${audience.toLocaleString()} · ${d.states.length ? d.states.join(', ') : 'All contacts'}`],
+              ['Schedule', `${launchPlan.length} ${launchPlan.length === 1 ? 'batch' : 'batches'} set up automatically, starting with ${(launchPlan[0]?.size || 0).toLocaleString()} today`],
               ['Subject', preview.subject],
               ['Replies', 'Your info@ inbox and the Inbox page here'],
             ].map(([k, v]) => (
@@ -326,12 +319,6 @@ export default function CampaignEditor(props: {
                 <input aria-label="Days" type="number" min={1} max={30} value={d.followup_days || 5} onChange={(e) => set({ followup_days: Number(e.target.value) })} className="mx-1.5 w-12 rounded border border-line px-1 text-center" />
                 days later. Anyone who replied is skipped.</span></span>
           </label>
-
-          <details className="mt-3 rounded-lg border border-line px-3 py-2 text-sm">
-            <summary className="cursor-pointer font-semibold">Footer line: why they get this email</summary>
-            <textarea aria-label="Why they get this email" rows={2} className="field mt-2" value={d.reason} onChange={(e) => set({ reason: e.target.value })} placeholder="Empty uses the text from Settings" />
-            <p className="hint">It has to be true for everyone in this list.</p>
-          </details>
 
           <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
             {checks.map((c) => (

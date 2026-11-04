@@ -2,6 +2,7 @@ import { all, batch, getKv, lease, one, release, run, setKv } from './db'
 import { dailyCapacity, deliver, noteError, noteOk, pickProvider } from './providers'
 import { allowedBy } from './plan'
 import { TEMPLATES } from './seed'
+import { reasonFor } from './lists'
 import { renderEmail } from './email'
 import { getSettings, isLive } from './settings'
 import { preflight } from './preflight'
@@ -37,7 +38,8 @@ export async function startCampaign(id: number): Promise<number> {
     if (blocked) throw new Error(`${blocked.label}: ${blocked.help}`)
   }
   const { where, args } = audience(c)
-  const r = await run(`INSERT OR IGNORE INTO sends (campaign_id, contact_id, email) SELECT ?, c.id, c.email FROM contacts c WHERE ${where}`, [id, ...args])
+  const r = await run(`INSERT OR IGNORE INTO sends (campaign_id, contact_id, email) SELECT ?, c.id, c.email FROM contacts c WHERE ${where}
+    ORDER BY CASE c.list_name WHEN 'clients' THEN 0 WHEN 'business' THEN 1 ELSE 2 END, c.id`, [id, ...args])
   if (!r.changes) throw new Error('Nobody matches this campaign')
   await run("UPDATE campaigns SET status = 'running', started_at = ? WHERE id = ?", [Date.now(), id])
   if (c.followup_key && Number(c.followup_days) > 0) await attachFollowup(id, String(c.followup_key), Number(c.followup_days))
@@ -98,7 +100,7 @@ export async function tick(): Promise<TickResult> {
     const held = await heldForBatch()
 
     const next = await one(`SELECT s.id, s.contact_id, s.attempts, ct.email, ct.first_name, ct.last_name, ct.state, ct.status contact_status,
-        ct.company, cp.subject, cp.html, cp.preheader, cp.reason
+        ct.company, ct.list_name contact_list, cp.subject, cp.html, cp.preheader, cp.reason
       FROM sends s JOIN campaigns cp ON cp.id = s.campaign_id JOIN contacts ct ON ct.id = s.contact_id
       WHERE s.status = 'queued' AND cp.status = 'running'${held.length ? ` AND cp.id NOT IN (${held.join(',')})` : ''} ORDER BY cp.auto_child DESC, cp.started_at, s.id LIMIT 1`)
     if (!next) {
@@ -122,7 +124,7 @@ export async function tick(): Promise<TickResult> {
     const messageId = `<${crypto.randomUUID()}@${domain}>`
     await run("UPDATE sends SET status = 'sending', attempts = attempts + 1 WHERE id = ?", [next.id])
     try {
-      const mail = await renderEmail({ subject: next.subject, html: next.html, preheader: next.preheader, reason: next.reason }, next as never, settings)
+      const mail = await renderEmail({ subject: next.subject, html: next.html, preheader: next.preheader, reason: next.reason || reasonFor(String(next.contact_list)) }, next as never, settings)
       await deliver(provider.name, { from: `"${settings.from_name}" <${settings.from_email}>`, to: next.email, replyTo: settings.reply_to, messageId, ...mail })
       await run("UPDATE sends SET status = 'sent', provider = ?, message_id = ?, sent_at = ?, last_error = NULL WHERE id = ?", [provider.name, messageId, Date.now(), next.id])
       await noteOk(provider.name)
