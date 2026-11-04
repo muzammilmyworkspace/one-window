@@ -37,7 +37,7 @@ function useEngine(setStatus: (s: string) => void) {
   }, [router, setStatus])
 }
 
-export default function Shell({ unread, live, children }: { unread: number; live: boolean; children: React.ReactNode }) {
+export default function Shell({ unread, live, open, workspace, children }: { unread: number; live: boolean; open: boolean; workspace: string; children: React.ReactNode }) {
   const path = usePathname()
   const [status, setStatus] = useState('')
   useEngine(setStatus)
@@ -51,10 +51,10 @@ export default function Shell({ unread, live, children }: { unread: number; live
     <div className="flex min-h-full flex-col lg:flex-row">
       <aside className="flex-none bg-deep text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-60 lg:flex-col">
         <div className="flex items-center gap-2.5 px-5 pb-3 pt-4 lg:pb-6 lg:pt-6">
-          <img src="/logo-mark.svg" alt="" className="h-8 w-8" />
+          <img src="/logo.svg" alt="" className="h-9 w-9" />
           <div>
-            <p className="font-display text-lg font-bold leading-none tracking-tight">Outreach</p>
-            <p className="mt-1 text-xs text-white/60">The Support Life</p>
+            <p className="font-display text-lg font-semibold leading-none tracking-tight">One Window</p>
+            <p className="mt-1 text-xs text-white/60">{workspace}</p>
           </div>
         </div>
         <nav aria-label="Main" className="flex gap-1 overflow-x-auto px-3 pb-3 lg:flex-1 lg:flex-col lg:overflow-visible lg:pb-0">
@@ -79,6 +79,11 @@ export default function Shell({ unread, live, children }: { unread: number; live
         </div>
       </aside>
       <div className="min-w-0 flex-1">
+        {open && (
+          <div role="alert" className="bg-bad px-4 py-2 text-center text-[13px] font-bold text-white lg:px-8">
+            Anyone with this link can open One Window. Set ADMIN_PASSWORD to protect it.
+          </div>
+        )}
         {!live && (
           <div className="bg-sun-soft px-4 py-2 text-center text-[13px] font-bold text-sun-ink lg:px-8">
             Practice mode: nothing is really sent. Real sending starts when SEND_MODE is set to live.

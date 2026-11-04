@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Icon } from './ui'
+import { Badge, Icon } from './ui'
 
 export interface Draft { id?: number; name: string; subject: string; preheader: string; html: string; states: string[]; follow_up_of: number | null }
 interface Template { key: string; label: string; name: string; subject: string; preheader: string; html: string }
 interface Option { id: number; name: string; sent: number }
+interface Check { label: string; ok: boolean; blocking: boolean; help: string }
 
 const post = (url: string, body: unknown, method = 'POST') =>
   fetch(url, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
@@ -28,6 +29,7 @@ export default function CampaignEditor(props: {
   const [testTo, setTestTo] = useState('')
   const [testVia, setTestVia] = useState('brevo')
   const [confirm, setConfirm] = useState<number | null>(null)
+  const [checks, setChecks] = useState<Check[]>([])
   const editor = useRef<HTMLDivElement>(null)
 
   // The editor owns its DOM while typing. It is only rewritten when the content changes from outside.
@@ -91,6 +93,7 @@ export default function CampaignEditor(props: {
     const id = await save()
     if (!id) return
     const data = await (await fetch(`/api/campaigns/${id}`)).json()
+    setChecks(data.checks || [])
     setConfirm(data.audience)
   }
 
@@ -220,7 +223,7 @@ export default function CampaignEditor(props: {
         </section>
 
         <section className="card space-y-2 p-5">
-          {note && <p role="status" className={`text-sm font-semibold ${note.ok ? 'text-brand-dark' : 'text-bad'}`}>{note.text}</p>}
+          {note && <p role="status" className={`text-sm font-semibold ${note.ok ? 'text-good' : 'text-bad'}`}>{note.text}</p>}
           <button type="button" disabled={busy} onClick={askStart} className="btn btn-primary w-full"><Icon name="send" size={15} /> Review and start</button>
           <button type="button" disabled={busy} onClick={save} className="btn btn-ghost w-full">Save draft</button>
           {d.id && <button type="button" disabled={busy} onClick={remove} className="btn btn-danger w-full">Delete draft</button>}
@@ -239,9 +242,23 @@ export default function CampaignEditor(props: {
                 <li className={props.live ? 'font-bold text-bad' : 'font-bold text-sun-ink'}>{props.live ? 'These are real emails. This cannot be undone, only paused.' : 'Practice mode: nothing will really be sent.'}</li>
               </ul>
             )}
+            {confirm > 0 && (
+              <ul className="mt-4 divide-y divide-line rounded-xl border border-line">
+                {checks.map((c) => (
+                  <li key={c.label} className="flex items-start gap-2.5 px-3 py-2">
+                    <Icon name={c.ok ? 'check' : c.blocking ? 'x' : 'alert'} size={15} className={`mt-0.5 flex-none ${c.ok ? 'text-good' : c.blocking ? 'text-bad' : 'text-sun-ink'}`} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">{c.label}</p>
+                      {!c.ok && <p className="text-[12.5px] leading-snug text-ink-2">{c.help}</p>}
+                    </div>
+                    {!c.ok && c.blocking && props.live && <Badge tone="bad">Required</Badge>}
+                  </li>
+                ))}
+              </ul>
+            )}
             <div className="mt-5 flex justify-end gap-2">
               <button type="button" className="btn btn-ghost" onClick={() => setConfirm(null)}>Cancel</button>
-              {confirm > 0 && <button type="button" disabled={busy} className="btn btn-primary" onClick={start}>Start sending</button>}
+              {confirm > 0 && <button type="button" disabled={busy || (props.live && checks.some((c) => c.blocking && !c.ok))} className="btn btn-primary" onClick={start}>Start sending</button>}
             </div>
           </div>
         </div>

@@ -18,7 +18,7 @@ export default function SendsChart({ data }: { data: { day: string; n: number }[
         {[1, 0.5, 0].map((f) => (
           <div key={f} className="absolute inset-x-0 flex items-center gap-2" style={{ top: H - H * f - 7 }}>
             <span className="w-7 text-right text-[11px] tabular-nums text-ink-3">{Math.round(top * f)}</span>
-            <span className={`h-px flex-1 ${f === 0 ? 'bg-[#cfdbd6]' : 'bg-line'}`} />
+            <span className={`h-px flex-1 ${f === 0 ? 'bg-[#d5d6cf]' : 'bg-line'}`} />
           </div>
         ))}
         <div className="absolute left-9 right-0 top-0 flex items-end gap-[2px]" style={{ height: H }}>

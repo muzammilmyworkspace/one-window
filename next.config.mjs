@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 export default {
   poweredByHeader: false,
+  devIndicators: false,
   serverExternalPackages: ['@libsql/client', 'libsql', 'nodemailer', 'imapflow', 'mailparser', 'exceljs'],
   async headers() {
     return [{ source: '/:path*', headers: [

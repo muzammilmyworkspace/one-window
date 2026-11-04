@@ -44,7 +44,7 @@ export function ProviderCard(p: { name: string; label: string; cap: number; used
       <input id={`cap-${p.name}`} type="number" min={0} className="field" value={cap} onChange={(e) => setCap(e.target.value)} onBlur={saveCap} />
       {p.missing.length > 0 && <p className="mt-2 text-[13px] font-semibold text-bad">Missing: {p.missing.join(', ')}</p>}
       {p.lastError && <p className="mt-2 break-words text-[13px] font-semibold text-bad">{p.lastError}</p>}
-      {note && <p role="status" className={`mt-2 break-words text-[13px] font-semibold ${note.ok ? 'text-brand-dark' : 'text-bad'}`}>{note.text}</p>}
+      {note && <p role="status" className={`mt-2 break-words text-[13px] font-semibold ${note.ok ? 'text-good' : 'text-bad'}`}>{note.text}</p>}
       <div className="mt-3 flex gap-2">
         <button type="button" disabled={busy} onClick={test} className="btn btn-ghost flex-1">{busy ? 'Testing…' : 'Test login'}</button>
         <button type="button" onClick={toggle} className="btn btn-ghost">{p.enabled ? 'Turn off' : 'Turn on'}</button>
@@ -97,6 +97,19 @@ export function SettingsForm({ settings }: { settings: Settings }) {
       </div>
     </form>
   )
+}
+
+export function ResetPractice() {
+  const router = useRouter()
+  const [busy, setBusy] = useState(false)
+  async function reset() {
+    if (!window.confirm('Delete all practice campaigns, sends and replies? Contacts stay.')) return
+    setBusy(true)
+    await post('/api/settings', { reset_practice: true })
+    setBusy(false)
+    router.refresh()
+  }
+  return <button type="button" disabled={busy} onClick={reset} className="btn btn-danger">Clear practice data</button>
 }
 
 export function CopyField({ label, value }: { label: string; value: string }) {

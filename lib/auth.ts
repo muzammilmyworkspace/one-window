@@ -1,5 +1,5 @@
 // Web Crypto only: this file also runs in proxy.ts.
-export const COOKIE = 'outreach_session'
+export const COOKIE = 'one_window_session'
 const DAYS = 14
 
 const secret = () => process.env.AUTH_SECRET || ''

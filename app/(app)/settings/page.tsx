@@ -1,4 +1,4 @@
-import { CopyField, ProviderCard, SettingsForm } from '@/components/SettingsParts'
+import { CopyField, ProviderCard, ResetPractice, SettingsForm } from '@/components/SettingsParts'
 import { Badge, Icon, PageHead, when } from '@/components/ui'
 import { getKv } from '@/lib/db'
 import { imapConfigured } from '@/lib/inbox'
@@ -8,8 +8,8 @@ import { getSettings, isLive } from '@/lib/settings'
 function Check({ ok, label, help }: { ok: boolean; label: string; help: string }) {
   return (
     <li className="flex items-start gap-2.5 py-2.5">
-      <span className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full ${ok ? 'bg-brand-soft text-brand-dark' : 'bg-bad-soft text-bad'}`}><Icon name={ok ? 'check' : 'x'} size={12} /></span>
-      <div className="min-w-0"><p className="text-sm font-bold">{label} <span className={`font-semibold ${ok ? 'text-brand-dark' : 'text-bad'}`}>{ok ? 'found' : 'missing'}</span></p><p className="text-[13px] text-ink-2">{help}</p></div>
+      <span className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full ${ok ? 'bg-good-soft text-good' : 'bg-bad-soft text-bad'}`}><Icon name={ok ? 'check' : 'x'} size={12} /></span>
+      <div className="min-w-0"><p className="text-sm font-bold">{label} <span className={`font-semibold ${ok ? 'text-good' : 'text-bad'}`}>{ok ? 'found' : 'missing'}</span></p><p className="text-[13px] text-ink-2">{help}</p></div>
     </li>
   )
 }
@@ -68,6 +68,16 @@ export default async function SettingsPage() {
           <CopyField label="Resend webhook: email.delivered, email.opened, email.bounced, email.complained" value={`${app}/api/webhooks/resend?token=${secret}`} />
         </div>
       </section>
+
+      {!isLive() && (
+        <section className="card mt-5 flex flex-wrap items-center justify-between gap-3 p-5">
+          <div>
+            <h2 className="text-base">Practice data</h2>
+            <p className="mt-0.5 text-[13px] text-ink-2">Clear test campaigns before the first real one, so the numbers start at zero.</p>
+          </div>
+          <ResetPractice />
+        </section>
+      )}
     </>
   )
 }

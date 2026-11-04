@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import CampaignButtons from '@/components/CampaignButtons'
 import CampaignEditor from '@/components/CampaignEditor'
-import { Empty, Icon, Meter, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
+import { Empty, Icon, Meter, Notice, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
 import { all, one } from '@/lib/db'
 import { renderEmail } from '@/lib/email'
 import { editorData } from '@/lib/editorData'
@@ -52,8 +52,10 @@ export default async function CampaignPage({ params, searchParams }: { params: P
     <>
       <PageHead title={String(c.name)} sub={<Link href="/campaigns" className="hover:underline">Back to campaigns</Link>}>
         <StatusBadge status={String(c.status)} />
-        <CampaignButtons id={id} status={String(c.status)} />
+        <CampaignButtons id={id} status={String(c.status)} failed={stats.failed} full />
       </PageHead>
+
+      {c.pause_reason && <Notice tone="bad">{String(c.pause_reason)} Check the list before you resume.</Notice>}
 
       <section className="card mb-5 p-5">
         <div className="mb-2 flex justify-between gap-3 text-sm"><span className="font-bold">{stats.sent.toLocaleString()} of {stats.total.toLocaleString()} sent</span><span className="tabular-nums text-ink-2">{pct(stats.sent, stats.total)}</span></div>

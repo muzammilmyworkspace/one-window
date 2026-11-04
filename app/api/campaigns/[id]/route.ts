@@ -1,13 +1,14 @@
 import { fail, json, route } from '@/lib/api'
 import { one, run } from '@/lib/db'
-import { audienceCount, startCampaign } from '@/lib/engine'
+import { audienceCount, campaignStats, duplicateCampaign, retryFailed, startCampaign } from '@/lib/engine'
+import { preflight } from '@/lib/preflight'
 
 type Ctx = { params: Promise<{ id: string }> }
 
 export const GET = route(async (_: Request, ctx: Ctx) => {
   const c = await one('SELECT * FROM campaigns WHERE id = ?', [Number((await ctx.params).id)])
   if (!c) return fail('Not found', 404)
-  return json({ audience: await audienceCount(c) })
+  return json({ audience: await audienceCount(c), checks: await preflight() })
 })
 
 export const PUT = route(async (req: Request, ctx: Ctx) => {
@@ -25,7 +26,12 @@ export const POST = route(async (req: Request, ctx: Ctx) => {
   const { action } = await req.json()
   if (action === 'start') return json({ queued: await startCampaign(id) })
   if (action === 'pause') await run("UPDATE campaigns SET status = 'paused' WHERE id = ? AND status = 'running'", [id])
-  else if (action === 'resume') await run("UPDATE campaigns SET status = 'running' WHERE id = ? AND status = 'paused'", [id])
+  else if (action === 'resume') {
+    const s = await campaignStats(id)
+    await run("UPDATE campaigns SET status = 'running', pause_reason = NULL, safety_ack = ? WHERE id = ? AND status = 'paused'", [s.bounced + s.complained, id])
+  }
+  else if (action === 'retry') return json({ queued: await retryFailed(id) })
+  else if (action === 'duplicate') return json({ id: await duplicateCampaign(id) })
   else return fail('Unknown action')
   return json({ ok: true })
 })

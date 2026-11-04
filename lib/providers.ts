@@ -48,6 +48,7 @@ export async function pickProvider(): Promise<{ name: ProviderName; left: number
 export interface Outgoing {
   from: string; to: string; replyTo: string; subject: string; html: string; text: string
   messageId: string; headers?: Record<string, string>
+  bcc?: string; inReplyTo?: string; references?: string
 }
 export async function deliver(name: ProviderName, m: Outgoing): Promise<void> {
   if (!isLive()) { await new Promise((r) => setTimeout(r, 40)); return }

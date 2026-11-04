@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { MarkUnread, SyncButton } from '@/components/InboxActions'
+import ReplyBox from '@/components/ReplyBox'
 import { Empty, Icon, Notice, PageHead, StatusBadge, when } from '@/components/ui'
 import { all, getKv, one, run } from '@/lib/db'
 import { imapConfigured } from '@/lib/inbox'
@@ -28,10 +29,10 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
     all('SELECT kind, COUNT(*) n FROM replies GROUP BY kind'),
     getKv('inbox_synced'), getKv('inbox_error'), getSettings(),
   ])
+  const answers = open ? await all('SELECT * FROM answers WHERE reply_id = ? ORDER BY sent_at', [Number(open.id)]) : []
   const count = (k: string) => Number(counts.find((c) => c.kind === k)?.n || 0)
   const connected = imapConfigured()
   const [said, quoted] = open ? splitQuote(String(open.body)) : ['', '']
-  const reSubject = open ? (/^re:/i.test(String(open.subject)) ? String(open.subject) : `Re: ${open.subject}`) : ''
 
   return (
     <>
@@ -93,8 +94,14 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
                   <div className="mt-2 whitespace-pre-wrap break-words">{quoted}</div>
                 </details>
               )}
+              {answers.map((a) => (
+                <div key={a.id} className="mx-5 mb-4 rounded-lg bg-brand-soft px-4 py-3">
+                  <p className="text-[13px] font-semibold text-brand-dark">You replied · {when(a.sent_at)}</p>
+                  <div className="mt-1 whitespace-pre-wrap break-words text-sm">{a.body}</div>
+                </div>
+              ))}
+              <ReplyBox id={Number(open.id)} to={String(open.from_email)} />
               <div className="flex flex-wrap items-center gap-2 border-t border-line p-4">
-                <a href={`mailto:${open.from_email}?subject=${encodeURIComponent(reSubject)}`} className="btn btn-primary"><Icon name="reply" size={15} /> Reply</a>
                 <a href={settings.webmail_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost"><Icon name="link" size={15} /> Open info@ webmail</a>
                 <MarkUnread id={Number(open.id)} />
               </div>

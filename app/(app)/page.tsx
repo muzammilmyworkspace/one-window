@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { all, getKv, one } from '@/lib/db'
 import { campaignStats, dailySends } from '@/lib/engine'
 import { missingCreds, PROVIDER_LABEL, providers, usedToday } from '@/lib/providers'
-import { Empty, Icon, Meter, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
+import { Empty, Icon, Meter, Notice, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
 import SendsChart from '@/components/SendsChart'
 import CampaignButtons from '@/components/CampaignButtons'
 
@@ -30,10 +30,11 @@ export default async function Dashboard() {
 
       {running && rs && (
         <section className="card mb-5 p-5">
+          {running.pause_reason && <Notice tone="bad">{String(running.pause_reason)}</Notice>}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <Link href={`/campaigns/${running.id}`} className="font-display text-lg font-bold hover:underline">{running.name}</Link>
+                <Link href={`/campaigns/${running.id}`} className="font-display text-lg font-semibold hover:underline">{running.name}</Link>
                 <StatusBadge status={running.status} />
               </div>
               <p className="mt-1 text-sm text-ink-2">

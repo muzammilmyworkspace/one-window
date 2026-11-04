@@ -26,7 +26,7 @@ export function ImportButton() {
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-3">
-      {note && <p role="status" className={`text-sm font-semibold ${note.ok ? 'text-brand-dark' : 'text-bad'}`}>{note.text}</p>}
+      {note && <p role="status" className={`text-sm font-semibold ${note.ok ? 'text-good' : 'text-bad'}`}>{note.text}</p>}
       <input ref={input} type="file" accept=".xlsx,.csv" className="sr-only" aria-label="Contacts file" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
       <button type="button" disabled={busy} onClick={() => input.current?.click()} className="btn btn-primary"><Icon name="upload" size={16} /> {busy ? 'Importing…' : 'Import Excel or CSV'}</button>
     </div>

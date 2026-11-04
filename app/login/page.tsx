@@ -1,37 +1,18 @@
-'use client'
+import LoginForm from '@/components/LoginForm'
 
-import { useState } from 'react'
+export const dynamic = 'force-dynamic'
 
 export default function LoginPage() {
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [busy, setBusy] = useState(false)
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault()
-    setBusy(true)
-    setError('')
-    const res = await fetch('/api/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ password }) })
-    if (res.ok) { window.location.href = '/'; return }
-    setError((await res.json().catch(() => ({}))).error || 'Could not sign in')
-    setBusy(false)
-  }
-
   return (
-    <main className="flex min-h-full items-center justify-center bg-deep p-4">
-      <form onSubmit={submit} className="card w-full max-w-sm p-7">
-        <div className="mb-6 flex items-center gap-3">
-          <img src="/logo-mark.svg" alt="" className="h-10 w-10" />
-          <div>
-            <h1 className="text-xl">Outreach</h1>
-            <p className="text-[13px] text-ink-3">The Support Life</p>
-          </div>
-        </div>
-        <label htmlFor="password" className="label">Password</label>
-        <input id="password" type="password" autoFocus autoComplete="current-password" className="field" value={password} onChange={(e) => setPassword(e.target.value)} />
-        {error && <p role="alert" className="mt-2 text-sm font-semibold text-bad">{error}</p>}
-        <button disabled={busy || !password} className="btn btn-primary mt-5 w-full">{busy ? 'Signing in…' : 'Sign in'}</button>
-      </form>
+    <main className="relative flex min-h-full items-center justify-center overflow-hidden bg-deep p-4">
+      <div className="absolute inset-0 opacity-[0.07]" aria-hidden="true"
+        style={{ backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)', backgroundSize: '56px 56px' }} />
+      <div className="relative w-full max-w-sm rounded-2xl bg-white p-8 shadow-2xl">
+        <img src="/logo.svg" alt="" className="h-12 w-12" />
+        <h1 className="mt-5 text-[28px] leading-none">One Window</h1>
+        <p className="mt-2 text-[15px] leading-snug text-ink-2">Every campaign, contact and reply in one place.</p>
+        <LoginForm needsPassword={!!process.env.ADMIN_PASSWORD} />
+      </div>
     </main>
   )
 }

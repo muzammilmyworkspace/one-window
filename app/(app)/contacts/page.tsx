@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { ImportButton, StatusToggle } from '@/components/ContactActions'
-import { Empty, PageHead, Stat, StatusBadge } from '@/components/ui'
+import { Empty, Icon, PageHead, Stat, StatusBadge } from '@/components/ui'
 import { all, one } from '@/lib/db'
 
 const PAGE = 50
@@ -30,6 +30,7 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
   return (
     <>
       <PageHead title="Contacts" sub="Importing the same file twice is safe: nobody is added twice, and unsubscribes stay.">
+        <a href="/api/export?type=contacts" className="btn btn-ghost"><Icon name="download" size={16} /> Export</a>
         <ImportButton />
       </PageHead>
 

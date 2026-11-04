@@ -23,6 +23,7 @@ async function apply(provider: string, email: string, messageId: string | undefi
     await run('UPDATE sends SET bounced_at = COALESCE(bounced_at, ?) WHERE id = ?', [now, send.id])
     await run("UPDATE contacts SET status = 'bounced' WHERE id = ? AND status = 'active'", [send.contact_id])
   }
+  if (ev === 'complained') await run('UPDATE sends SET complained_at = COALESCE(complained_at, ?) WHERE id = ?', [now, send.id])
   if (ev === 'complained' || ev === 'unsubscribed') await run("UPDATE contacts SET status = 'unsubscribed' WHERE id = ?", [send.contact_id])
 }
 

@@ -77,8 +77,24 @@ CREATE TABLE IF NOT EXISTS providers (
 );
 INSERT OR IGNORE INTO providers (name, daily_cap) VALUES ('brevo', 280), ('resend', 95);
 
+CREATE TABLE IF NOT EXISTS answers (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  reply_id INTEGER NOT NULL,
+  body TEXT NOT NULL,
+  provider TEXT,
+  sent_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS answers_reply ON answers(reply_id);
+
 CREATE TABLE IF NOT EXISTS kv (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 `
+
+// Columns added after the first release. Adding one that exists fails, which is fine.
+const COLUMNS = [
+  'ALTER TABLE campaigns ADD COLUMN pause_reason TEXT',
+  'ALTER TABLE campaigns ADD COLUMN safety_ack INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE sends ADD COLUMN complained_at INTEGER',
+]
 
 function client(): Client {
   if (!g.__db) {
@@ -89,7 +105,10 @@ function client(): Client {
 
 export function ready(): Promise<void> {
   if (!g.__dbReady) {
-    g.__dbReady = client().executeMultiple(SCHEMA).catch((e) => {
+    g.__dbReady = (async () => {
+      await client().executeMultiple(SCHEMA)
+      for (const sql of COLUMNS) await client().execute(sql).catch(() => {})
+    })().catch((e) => {
       g.__dbReady = undefined
       throw e
     })

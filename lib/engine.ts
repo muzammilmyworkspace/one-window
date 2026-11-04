@@ -2,9 +2,11 @@ import { all, batch, getKv, lease, one, release, run, setKv } from './db'
 import { deliver, noteError, noteOk, pickProvider } from './providers'
 import { renderEmail } from './email'
 import { getSettings, isLive } from './settings'
+import { preflight } from './preflight'
 import { imapConfigured, syncInbox } from './inbox'
 
 const INBOX_EVERY = 2 * 60 * 1000
+export const SAFETY = { bounce: 0.05, minBounce: 50, complaint: 0.003, minComplaint: 100, ackStep: 3 }
 
 function audience(c: { states?: unknown; follow_up_of?: unknown }) {
   const states = String(c.states || '').split(',').filter(Boolean)
@@ -26,8 +28,10 @@ export async function audienceCount(c: { states?: unknown; follow_up_of?: unknow
 export async function startCampaign(id: number): Promise<number> {
   const c = await one('SELECT * FROM campaigns WHERE id = ?', [id])
   if (!c || c.status !== 'draft') throw new Error('Only a draft can be started')
-  // recipients need a public unsubscribe link, which a localhost address is not
-  if (isLive() && !(process.env.APP_URL || '').startsWith('https://')) throw new Error('Put the tool online first: real campaigns need a public https address for the unsubscribe link')
+  if (isLive()) {
+    const blocked = (await preflight()).find((x) => x.blocking && !x.ok)
+    if (blocked) throw new Error(`${blocked.label}: ${blocked.help}`)
+  }
   const { where, args } = audience(c)
   const r = await run(`INSERT OR IGNORE INTO sends (campaign_id, contact_id, email) SELECT ?, c.id, c.email FROM contacts c WHERE ${where}`, [id, ...args])
   if (!r.changes) throw new Error('Nobody matches this campaign')
@@ -60,6 +64,8 @@ export async function tick(): Promise<TickResult> {
   try {
     // we hold the only lease, so a row still marked 'sending' was left by a crash
     await run("UPDATE sends SET status = 'queued' WHERE status = 'sending'")
+
+    await safetyStop()
 
     const next = await one(`SELECT s.id, s.contact_id, s.attempts, ct.email, ct.first_name, ct.last_name, ct.state, ct.status contact_status,
         cp.subject, cp.html, cp.preheader
@@ -109,6 +115,21 @@ export async function tick(): Promise<TickResult> {
   }
 }
 
+/** A list going bad hurts the domain for good, so a running campaign stops itself in time. */
+async function safetyStop() {
+  const rows = await all(`SELECT c.id, c.safety_ack,
+      SUM(s.sent_at IS NOT NULL) sent, SUM(s.bounced_at IS NOT NULL) bounced, SUM(s.complained_at IS NOT NULL) complained
+    FROM campaigns c JOIN sends s ON s.campaign_id = c.id WHERE c.status = 'running' GROUP BY c.id`)
+  for (const r of rows) {
+    const sent = Number(r.sent), bounced = Number(r.bounced), complained = Number(r.complained)
+    if (bounced + complained < Number(r.safety_ack) + SAFETY.ackStep) continue
+    let reason = ''
+    if (sent >= SAFETY.minBounce && bounced / sent > SAFETY.bounce) reason = `Paused automatically: ${bounced} of ${sent} emails bounced, over the ${SAFETY.bounce * 100}% safety limit.`
+    if (sent >= SAFETY.minComplaint && complained / sent > SAFETY.complaint) reason = `Paused automatically: ${complained} of ${sent} people marked this as spam, over the ${SAFETY.complaint * 100}% safety limit.`
+    if (reason) await run("UPDATE campaigns SET status = 'paused', pause_reason = ? WHERE id = ?", [reason, Number(r.id)])
+  }
+}
+
 export async function campaignStats(id?: number) {
   const r = await one(`SELECT COUNT(*) total,
     SUM(status IN ('queued','sending')) queued,
@@ -117,11 +138,27 @@ export async function campaignStats(id?: number) {
     SUM(opened_at IS NOT NULL) opened,
     SUM(replied_at IS NOT NULL) replied,
     SUM(bounced_at IS NOT NULL) bounced,
+    SUM(complained_at IS NOT NULL) complained,
     SUM(status = 'failed') failed,
     SUM(status = 'skipped') skipped
     FROM sends ${id ? 'WHERE campaign_id = ?' : ''}`, id ? [id] : [])
   const n = (k: string) => Number(r?.[k] || 0)
-  return { total: n('total'), queued: n('queued'), sent: n('sent'), delivered: n('delivered'), opened: n('opened'), replied: n('replied'), bounced: n('bounced'), failed: n('failed'), skipped: n('skipped') }
+  return { total: n('total'), queued: n('queued'), sent: n('sent'), delivered: n('delivered'), opened: n('opened'), replied: n('replied'), bounced: n('bounced'), complained: n('complained'), failed: n('failed'), skipped: n('skipped') }
+}
+
+/** Back in the queue: everyone who failed for a passing reason, not bad addresses. */
+export async function retryFailed(id: number): Promise<number> {
+  const r = await run("UPDATE sends SET status = 'queued', attempts = 0, last_error = NULL WHERE campaign_id = ? AND status = 'failed' AND bounced_at IS NULL", [id])
+  if (r.changes) await run("UPDATE campaigns SET status = 'running', completed_at = NULL WHERE id = ? AND status = 'completed'", [id])
+  return r.changes
+}
+
+export async function duplicateCampaign(id: number): Promise<number> {
+  const c = await one('SELECT * FROM campaigns WHERE id = ?', [id])
+  if (!c) throw new Error('Campaign not found')
+  const r = await run('INSERT INTO campaigns (name, subject, preheader, html, states, follow_up_of, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [`${c.name} (copy)`, c.subject as string, c.preheader as string, c.html as string, c.states as string, (c.follow_up_of ?? null) as number | null, Date.now()])
+  return r.id
 }
 
 export async function dailySends(days = 14) {

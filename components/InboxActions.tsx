@@ -20,7 +20,7 @@ export function SyncButton({ disabled }: { disabled: boolean }) {
   }
   return (
     <div className="flex flex-wrap items-center gap-3">
-      {note && <p role="status" className={`text-sm font-semibold ${note.ok ? 'text-brand-dark' : 'text-bad'}`}>{note.text}</p>}
+      {note && <p role="status" className={`text-sm font-semibold ${note.ok ? 'text-good' : 'text-bad'}`}>{note.text}</p>}
       <button type="button" disabled={busy || disabled} onClick={sync} className="btn btn-ghost"><Icon name="sync" size={15} /> {busy ? 'Checking…' : 'Check now'}</button>
     </div>
   )

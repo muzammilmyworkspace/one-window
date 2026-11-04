@@ -1,9 +1,14 @@
-import { json, route } from '@/lib/api'
-import { run } from '@/lib/db'
-import { saveSettings } from '@/lib/settings'
+import { fail, json, route } from '@/lib/api'
+import { batch, run } from '@/lib/db'
+import { isLive, saveSettings } from '@/lib/settings'
 
 export const POST = route(async (req: Request) => {
   const b = await req.json()
+  if (b.reset_practice) {
+    if (isLive()) return fail('Only possible in practice mode')
+    await batch(['answers', 'replies', 'sends', 'campaigns'].map((t) => ({ sql: `DELETE FROM ${t}`, args: [] })))
+    return json({ ok: true })
+  }
   if (b.settings) await saveSettings(b.settings)
   for (const name of ['brevo', 'resend']) {
     const p = b.providers?.[name]

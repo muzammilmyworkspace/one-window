@@ -16,6 +16,8 @@ const ICONS: Record<string, ReactNode> = {
   sync: <><path d="M20 11a8 8 0 0 0-14-4L3 10" /><path d="M3 4v6h6" /><path d="M4 13a8 8 0 0 0 14 4l3-3" /><path d="M21 20v-6h-6" /></>,
   out: <><path d="M9 21H5V3h4" /><path d="M16 17l5-5-5-5" /><path d="M21 12H9" /></>,
   upload: <><path d="M12 16V4" /><path d="M7 9l5-5 5 5" /><path d="M4 20h16" /></>,
+  copy: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15V6a2 2 0 0 1 2-2h9" /></>,
+  download: <><path d="M12 4v12" /><path d="M7 11l5 5 5-5" /><path d="M4 20h16" /></>,
   link: <><path d="M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1" /><path d="M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1" /></>,
 }
 
@@ -29,11 +31,11 @@ export function Icon({ name, size = 18, className = '' }: { name: keyof typeof I
 
 type Tone = 'good' | 'warn' | 'bad' | 'info' | 'mute'
 const TONE: Record<Tone, string> = {
-  good: 'bg-brand-soft text-brand-dark',
+  good: 'bg-good-soft text-good',
   warn: 'bg-sun-soft text-sun-ink',
   bad: 'bg-bad-soft text-bad',
   info: 'bg-blue-soft text-blue',
-  mute: 'bg-[#eef2f0] text-ink-2',
+  mute: 'bg-[#eeeeea] text-ink-2',
 }
 export function Badge({ tone, icon, children }: { tone: Tone; icon?: string; children: ReactNode }) {
   return (
@@ -45,9 +47,9 @@ export function Badge({ tone, icon, children }: { tone: Tone; icon?: string; chi
 
 const STATUS: Record<string, [Tone, string, string]> = {
   draft: ['mute', 'pause', 'Draft'],
-  running: ['good', 'send', 'Sending'],
+  running: ['info', 'send', 'Sending'],
   paused: ['warn', 'pause', 'Paused'],
-  completed: ['info', 'check', 'Completed'],
+  completed: ['good', 'check', 'Completed'],
   queued: ['mute', 'clock', 'Queued'],
   sending: ['good', 'send', 'Sending'],
   sent: ['good', 'check', 'Sent'],
@@ -82,7 +84,7 @@ export function Stat({ label, value, sub }: { label: string; value: string | num
   return (
     <div className="card p-4">
       <p className="text-[13px] font-semibold text-ink-2">{label}</p>
-      <p className="mt-1 font-display text-[30px] font-bold leading-none tracking-tight">{typeof value === 'number' ? value.toLocaleString() : value}</p>
+      <p className="mt-1 font-display text-[30px] font-semibold leading-none tracking-tight">{typeof value === 'number' ? value.toLocaleString() : value}</p>
       {sub && <p className="mt-2 text-[12.5px] leading-snug text-ink-3">{sub}</p>}
     </div>
   )
@@ -91,7 +93,7 @@ export function Stat({ label, value, sub }: { label: string; value: string | num
 export function Meter({ value, max, label }: { value: number; max: number; label: string }) {
   const pct = max ? Math.min(100, (value / max) * 100) : 0
   return (
-    <div role="progressbar" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} className="h-2 w-full overflow-hidden rounded-full bg-[#e6eeea]">
+    <div role="progressbar" aria-label={label} aria-valuenow={value} aria-valuemin={0} aria-valuemax={max} className="h-2 w-full overflow-hidden rounded-full bg-[#e9e9e4]">
       <div className="h-full rounded-full bg-brand transition-[width] duration-500" style={{ width: `${pct}%` }} />
     </div>
   )
@@ -101,7 +103,7 @@ export function Empty({ icon, title, children }: { icon: string; title: string; 
   return (
     <div className="px-6 py-12 text-center">
       <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-xl bg-brand-soft text-brand-dark"><Icon name={icon} size={20} /></span>
-      <p className="mt-3 font-display text-lg font-bold">{title}</p>
+      <p className="mt-3 font-display text-lg font-semibold">{title}</p>
       {children && <div className="mx-auto mt-1 max-w-sm text-sm text-ink-2">{children}</div>}
     </div>
   )
