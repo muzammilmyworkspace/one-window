@@ -1,27 +1,34 @@
 import { BUSINESS_REASON } from './lists'
 
 // The two starting emails. Header, footer and layout are added when the email is built.
-const G = '#0E9F6E', INK = '#17302A', SOFT = '#E9F7F1'
+const G = '#0E9F6E', DEEP = '#0C3A2C', INK = '#17302A', SOFT = '#F1F8F5', SUN = '#FFB020'
 
 const p = (t: string) => `<p style="margin:0 0 16px;">${t}</p>`
-const h1 = (t: string) => `<h1 style="margin:0 0 16px;font-size:25px;line-height:1.25;font-weight:bold;color:${INK};">${t}</h1>`
+const h1 = (t: string) => `<h1 style="margin:0 0 14px;font-size:30px;line-height:1.18;font-weight:bold;letter-spacing:-0.5px;color:${DEEP};">${t}</h1>`
 const box = (label: string, value: string) =>
-  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;"><tr><td style="background:${SOFT};border-left:4px solid ${G};border-radius:6px;padding:14px 18px;">
-<p style="margin:0;font-size:13px;color:#46665C;">${label}</p>
-<p style="margin:2px 0 0;font-size:18px;font-weight:bold;color:${INK};">${value}</p>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 24px;"><tr><td align="center" bgcolor="${DEEP}" style="background:${DEEP};border-radius:14px;padding:18px 20px;">
+<p style="margin:0;font-size:12px;font-weight:bold;letter-spacing:1.2px;text-transform:uppercase;color:${SUN};">${label}</p>
+<p style="margin:4px 0 0;font-size:25px;line-height:1.2;font-weight:bold;color:#ffffff;">${value}</p>
 </td></tr></table>`
 const btn = (label: string, utm: string) =>
-  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 20px;"><tr><td align="center" style="background:${G};border-radius:10px;">
-<a href="https://www.thesupportlife.com/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=${utm}" style="display:block;padding:16px 24px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:bold;">${label}</a>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:10px 0 24px;"><tr><td align="center" bgcolor="${SUN}" style="background:${SUN};border-radius:12px;">
+<a href="https://www.thesupportlife.com/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=${utm}" style="display:block;padding:18px 24px;color:${DEEP};text-decoration:none;font-size:18px;font-weight:bold;">${label} &rarr;</a>
 </td></tr></table>`
-const phone = `<a href="tel:+18722171852" style="color:${G};font-weight:bold;text-decoration:none;">(872) 217-1852</a>`
 const row = (mark: string, title: string, text: string) =>
-  `<tr><td width="42" valign="top" style="padding:0 0 16px;"><div style="width:30px;height:30px;line-height:30px;text-align:center;background:${G};border-radius:15px;color:#ffffff;font-size:14px;font-weight:bold;">${mark}</div></td>
-<td valign="top" style="padding:0 0 16px;">${title ? `<strong style="color:${INK};">${title}</strong><br>` : ''}${text}</td></tr>`
-const heading = (t: string) => `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">${t}</p>`
-const rows = (inner: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">${inner}</table>`
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 10px;"><tr><td bgcolor="${SOFT}" style="background:${SOFT};border-radius:12px;padding:14px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="46" valign="top"><div style="width:34px;height:34px;line-height:34px;text-align:center;background:${G};border-radius:17px;color:#ffffff;font-size:15px;font-weight:bold;">${mark}</div></td>
+<td valign="top" style="font-size:15px;line-height:1.5;">${title ? `<strong style="font-size:16px;color:${DEEP};">${title}</strong><br>` : ''}${text}</td></tr></table>
+</td></tr></table>`
+const heading = (t: string) => `<p style="margin:10px 0 12px;font-size:19px;font-weight:bold;color:${DEEP};">${t}</p>`
+const rows = (inner: string) => `<div style="margin:0 0 18px;">${inner}</div>`
+const stats = (items: [string, string][]) =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 22px;"><tr>${items.map(([v, l], i) =>
+    `<td width="33%" valign="top" style="padding:${i ? '0 0 0 8px' : '0'};"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" bgcolor="${SOFT}" style="background:${SOFT};border-radius:12px;padding:14px 6px;">
+<p style="margin:0;font-size:22px;line-height:1.1;font-weight:bold;color:${G};">${v}</p>
+<p style="margin:5px 0 0;font-size:12px;line-height:1.3;color:#4A6A60;">${l}</p>
+</td></tr></table></td>`).join('')}</tr></table>`
 
-export const emailBlocks = { p, h1, box, btn, row, rows, heading }
+export const emailBlocks = { p, h1, box, btn, row, rows, heading, stats }
 
 export const TEMPLATES = [
   {
@@ -37,8 +44,8 @@ export const TEMPLATES = [
       h1('Your 2027 health plan may cost more'),
       p('Hi {{first_name}},'),
       p('Open Enrollment for 2027 health coverage is open now. If you do nothing, your plan may simply renew, and this is a year where that could cost you.'),
-      box('Open Enrollment ends', 'January 15, 2027'),
-      `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">Three things that changed</p>`,
+      stats([['~15%', 'Median proposed 2027 increase'], ['Jan 15', 'Last day to enroll'], ['Free', 'Help from a licensed agent']]),
+      heading('Three things that changed'),
       rows([
         row('1', 'Premiums are going up.', "KFF's review of 276 insurers found a median proposed increase of about 15% for 2027."),
         row('2', 'The extra tax credits ended.', 'If your household income is above 400% of the poverty level, you may no longer qualify for help, so a small raise can cost you thousands a year.'),
@@ -46,7 +53,6 @@ export const TEMPLATES = [
       ].join('\n')),
       p("We can connect you with a licensed agent who will compare your 2027 options with you. It's free, and there's no obligation to enroll."),
       btn('Check my 2027 options', 'oe2027_email1'),
-      `<p style="margin:0 0 20px;text-align:center;">Prefer to talk? Call ${phone} or just reply to this email.</p>`,
       p('Thanks,<br><strong>The Support Life team</strong>'),
     ].join('\n'),
   },
@@ -64,7 +70,7 @@ export const TEMPLATES = [
       p('A quick follow-up on my last note. If you want new coverage to start on January 1, there is one date to remember.'),
       box('Marketplace deadline for January 1 coverage', 'December 15'),
       p('Open Enrollment closes completely on January 15.'),
-      `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">Before you renew, it's worth checking</p>`,
+      heading("Before you renew, it's worth checking"),
       rows([
         row('&#10003;', 'Monthly cost', 'What your plan will cost each month in 2027.'),
         row('&#10003;', 'Out-of-pocket costs', 'Your deductible and out-of-pocket maximum.'),
@@ -73,7 +79,6 @@ export const TEMPLATES = [
       ].join('\n')),
       p('A licensed agent can go through all of this with you in about 15 minutes. Free, and no obligation to enroll.'),
       btn('Get my free plan review', 'oe2027_email2'),
-      `<p style="margin:0 0 20px;text-align:center;">Or call ${phone}.</p>`,
       p('Thanks,<br><strong>The Support Life team</strong>'),
     ].join('\n'),
   },
@@ -90,8 +95,8 @@ export const TEMPLATES = [
       h1('Health coverage when you work for yourself'),
       p('Hi {{first_name}},'),
       p('If you run {{company}} and buy your own health insurance, Open Enrollment for 2027 is open now. It is worth a look before your plan renews.'),
-      box('Open Enrollment ends', 'January 15, 2027'),
-      `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">Why it matters for owners</p>`,
+      stats([['Jan 15', 'Last day to enroll'], ['15 min', 'With a licensed agent'], ['Free', 'No obligation to enroll']]),
+      heading('Why it matters for owners'),
       rows([
         row('1', 'Your income drives your savings.', 'Savings depend on your household and your expected yearly income, so owners with uneven income should estimate carefully.'),
         row('2', 'Prices are moving.', "KFF's review of 276 insurers found a median proposed increase of about 15% for 2027."),
@@ -99,7 +104,6 @@ export const TEMPLATES = [
       ].join('\n')),
       p("We can connect you with a licensed agent who will compare your options with you. It's free, and there's no obligation to enroll."),
       btn('Check my 2027 options', 'oe2027_business1'),
-      `<p style="margin:0 0 20px;text-align:center;">Prefer to talk? Call ${phone} or just reply to this email.</p>`,
       p('Thanks,<br><strong>The Support Life team</strong>'),
     ].join('\n'),
   },
@@ -118,7 +122,6 @@ export const TEMPLATES = [
       box('Marketplace deadline for January 1 coverage', 'December 15'),
       p('A licensed agent can go through your options with you in about 15 minutes. Free, and no obligation to enroll. Not relevant for you? Just reply "no thanks" and we will stop.'),
       btn('Get my free plan review', 'oe2027_business2'),
-      `<p style="margin:0 0 20px;text-align:center;">Or call ${phone}.</p>`,
       p('Thanks,<br><strong>The Support Life team</strong>'),
     ].join('\n'),
   },

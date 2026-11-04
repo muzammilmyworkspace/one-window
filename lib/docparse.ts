@@ -71,7 +71,6 @@ export function buildEmail(input: Block[]): ParsedDoc {
   const parts: string[] = []
   if (first) parts.push(e.h1(inline(first.text)))
   if (!greeted) parts.push(e.p('Hi {{first_name}},'))
-  const hasLink = blocks.some((b) => /https?:\/\//.test(b.text))
   const signed = blocks.slice(-4).some((b) => /^(thanks|thank you|regards|sincerely|best)\b/i.test(b.text))
 
   for (let i = 0; i < blocks.length; i++) {
@@ -85,10 +84,14 @@ export function buildEmail(input: Block[]): ParsedDoc {
         const m = r.text.match(/^([^:.]{3,60})[:.]\s+(.+)$/)
         return e.row(b.kind === 'ol' ? String(n + 1) : '&#10003;', m ? inline(m[1]) + '.' : '', inline(m ? m[2][0].toUpperCase() + m[2].slice(1) : r.text))
       }).join('\n')))
-    } else if (b.kind === 'h' || isHeading(b.text)) parts.push(e.heading(inline(b.text)))
+    } else if (/^(thanks|thank you|regards|sincerely|best)/i.test(blocks[i - 1]?.text || '')) parts.push(e.p(`<strong>${inline(b.text)}</strong>`))
+    else if (b.kind === 'h' || isHeading(b.text)) parts.push(e.heading(inline(b.text)))
     else parts.push(e.p(inline(b.text)))
   }
-  if (!hasLink) parts.push(e.btn('Check my options', 'upload'))
+  const signoff = parts.findLastIndex((x) => /thanks|thank you|regards|sincerely/i.test(x))
+  const button = e.btn('Check my options', 'upload')
+  if (signed && signoff >= 0) parts.splice(signoff, 0, button)
+  else parts.push(button)
   if (!signed) parts.push(e.p('Thanks,<br><strong>The Support Life team</strong>'))
   return { subject, preheader, html: parts.join('\n') }
 }
