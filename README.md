@@ -31,7 +31,7 @@ Domain ke DNS records (Brevo aur Resend dono ke) Hostinger > Domains > DNS mein 
 
 ## Vercel par live karna
 
-1. **Database:** turso.tech par free account, ek database banayein, URL aur token lein. Vercel par `local.db` nahi chalti.
+1. **Database:** Vercel project > Storage > Turso se database banayein aur project se connect karein. Ya turso.tech par banayein aur `DATABASE_URL` + `DATABASE_AUTH_TOKEN` daalein. Vercel par `local.db` nahi chalti.
 2. **GitHub:** is folder ko private repo mein push karein, Vercel mein import karein.
 3. **Environment Variables:** `.env.example` ki sab cheezein Vercel mein daalein (secrets ko Sensitive mark karein):
    - `SEND_MODE=dry` pehle

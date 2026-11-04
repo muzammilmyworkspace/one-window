@@ -1,4 +1,5 @@
 import { createClient, type Client, type InValue } from '@libsql/client'
+import { databaseToken, databaseUrl } from './setup'
 
 const g = globalThis as unknown as { __db?: Client; __dbReady?: Promise<void> }
 
@@ -98,7 +99,7 @@ const COLUMNS = [
 
 function client(): Client {
   if (!g.__db) {
-    g.__db = createClient({ url: process.env.DATABASE_URL || 'file:local.db', authToken: process.env.DATABASE_AUTH_TOKEN || undefined })
+    g.__db = createClient({ url: databaseUrl(), authToken: databaseToken() })
   }
   return g.__db
 }
