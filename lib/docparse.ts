@@ -84,7 +84,7 @@ export function buildEmail(input: Block[]): ParsedDoc {
         const m = r.text.match(/^([^:.]{3,60})[:.]\s+(.+)$/)
         return e.row(b.kind === 'ol' ? String(n + 1) : '&#10003;', m ? inline(m[1]) + '.' : '', inline(m ? m[2][0].toUpperCase() + m[2].slice(1) : r.text))
       }).join('\n')))
-    } else if (/^(thanks|thank you|regards|sincerely|best)/i.test(blocks[i - 1]?.text || '')) parts.push(e.p(`<strong>${inline(b.text)}</strong>`))
+    } else if (/^(thanks|thank you|regards|sincerely|best)\b/i.test(blocks[i - 1]?.text || '')) parts.push(e.p(`<strong>${inline(b.text)}</strong>`))
     else if (b.kind === 'h' || isHeading(b.text)) parts.push(e.heading(inline(b.text)))
     else parts.push(e.p(inline(b.text)))
   }
