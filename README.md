@@ -65,5 +65,8 @@ Kisi sender se 3 errors lagataar aayen to woh 1 ghanta rest karta hai aur doosra
 
 ## Nayi campaign
 
-5 steps: Name, Recipients, Content, Test, Launch. Content step mein PDF, Word (.docx) ya .txt upload karein. Pehli line "Subject: ..." ho to subject wahan se aata hai, warna heading se. Logo, footer aur design wahi rehte hain. File 4 MB tak.
+Campaigns page par state card dabayein, ya New campaign. 5 steps: State, Content, Batches, Test, Launch.
 
+Content mein PDF, Word (.docx) ya .txt upload ya drop karein (4 MB tak). Pehli line "Subject: ..." ho to subject wahan se aata hai, warna heading se. `{{first_name}}` aur `{{state_name}}` khud bharte hain. Logo, footer aur design wahi rehte hain.
+
+Batches poore domain ke hisaab se bante hain: warm-up 100, 200, 300 roz, phir poori limit. Doosri campaign queue mein ho to nayi campaign ki dates us ke baad aati hain. Launch par saare batches khud schedule ho jate hain.

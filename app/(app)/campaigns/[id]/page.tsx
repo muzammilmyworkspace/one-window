@@ -7,9 +7,9 @@ import { Empty, Icon, Meter, Notice, PageHead, pct, Stat, StatusBadge, when } fr
 import { all, one } from '@/lib/db'
 import { renderEmail } from '@/lib/email'
 import { editorData } from '@/lib/editorData'
-import { campaignStats } from '@/lib/engine'
-import { batches } from '@/lib/plan'
-import { dailyCapacity, PROVIDER_LABEL, type ProviderName } from '@/lib/providers'
+import { campaignStats, planContext } from '@/lib/engine'
+import { schedule } from '@/lib/plan'
+import { PROVIDER_LABEL, type ProviderName } from '@/lib/providers'
 import SendingPlan from '@/components/SendingPlan'
 import { TEMPLATES } from '@/lib/seed'
 import { getSettings } from '@/lib/settings'
@@ -50,7 +50,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   ])
   const pages = Math.max(1, Math.ceil(Number(count?.n || 0) / PAGE))
   const child = await one('SELECT id, name, followup_days FROM campaigns WHERE follow_up_of = ? AND auto_child = 1', [id])
-  const plan = batches(stats.total, stats.sent, await dailyCapacity(), !!c.warmup, Number(c.started_at))
+  const plan = schedule(stats.queued, !!c.warmup, await planContext(Number(c.started_at)))
   const link = (nf: string, p = 1) => `/campaigns/${id}?f=${nf}&p=${p}`
 
   return (
@@ -115,8 +115,9 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           </section>
         ) : (
           <section className="card p-4">
-            <h2 className="mb-3 text-base">Sending plan</h2>
-            <SendingPlan batches={plan} started />
+            <h2 className="text-base">Sending plan</h2>
+            <p className="mb-3 mt-0.5 text-[13px] text-ink-2">{stats.sent.toLocaleString()} sent, {stats.queued.toLocaleString()} still to go.</p>
+            <SendingPlan slots={plan} />
             <div className="mt-4 border-t border-line pt-4">
               <h3 className="mb-2 text-sm">Automatic follow-up</h3>
               {child ? (

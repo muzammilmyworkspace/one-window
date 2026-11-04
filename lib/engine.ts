@@ -1,6 +1,6 @@
 import { all, batch, getKv, lease, one, release, run, setKv } from './db'
 import { dailyCapacity, deliver, noteError, noteOk, pickProvider } from './providers'
-import { allowedBy } from './plan'
+import { dayLimit, type PlanContext } from './plan'
 import { TEMPLATES } from './seed'
 import { reasonFor } from './lists'
 import { renderEmail } from './email'
@@ -52,9 +52,9 @@ export async function attachFollowup(parentId: number, key: string, days: number
   const p = await one('SELECT * FROM campaigns WHERE id = ?', [parentId])
   if (!t || !p) throw new Error('Follow-up template not found')
   if (await one('SELECT 1 x FROM campaigns WHERE follow_up_of = ? AND auto_child = 1', [parentId])) throw new Error('This campaign already has an automatic follow-up')
-  await run(`INSERT INTO campaigns (name, subject, preheader, html, status, follow_up_of, list_name, reason, followup_days, auto_child, created_at, started_at)
-    VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, 1, ?, ?)`,
-    [`${p.name} (auto follow-up)`, t.subject, t.preheader, t.html, parentId, String(p.list_name), String(p.reason || ''), Math.max(1, days), Date.now(), Date.now()])
+  await run(`INSERT INTO campaigns (name, subject, preheader, html, status, follow_up_of, list_name, reason, followup_days, warmup, auto_child, created_at, started_at)
+    VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, 1, ?, ?)`,
+    [`${p.name} (auto follow-up)`, t.subject, t.preheader, t.html, parentId, String(p.list_name), String(p.reason || ''), Math.max(1, days), Number(p.warmup), Date.now(), Date.now()])
 }
 
 /** Queues the follow-up for everyone whose first email is old enough and who has not answered. */
@@ -150,13 +150,25 @@ export async function tick(): Promise<TickResult> {
   }
 }
 
-/** Warm-up campaigns that have finished today's batch and wait for the next one. */
+/** What the domain has done so far. Campaigns started earlier than `before` go first. */
+export async function planContext(before?: number): Promise<PlanContext> {
+  const now = Date.now()
+  const [capacity, first, used, ahead] = await Promise.all([
+    dailyCapacity(),
+    one<{ t: number | null }>('SELECT MIN(sent_at) t FROM sends'),
+    one<{ n: number }>('SELECT COUNT(*) n FROM sends WHERE sent_at > ?', [now - DAY]),
+    one<{ n: number }>(`SELECT COUNT(*) n FROM sends s JOIN campaigns c ON c.id = s.campaign_id
+      WHERE s.status IN ('queued','sending') AND c.status = 'running' AND c.started_at < ?`, [before ?? now + 1]),
+  ])
+  return { capacity, warmDay: first?.t ? Math.floor((now - Number(first.t)) / DAY) : 0, usedToday: Number(used?.n || 0), ahead: Number(ahead?.n || 0) }
+}
+
+/** Warm-up is for the whole domain: once today's amount is out, every warm-up campaign waits. */
 async function heldForBatch(): Promise<number[]> {
-  const rows = await all(`SELECT c.id, c.started_at, (SELECT COUNT(*) FROM sends s WHERE s.campaign_id = c.id AND s.sent_at IS NOT NULL) sent
-    FROM campaigns c WHERE c.status = 'running' AND c.warmup = 1`)
+  const rows = await all("SELECT id FROM campaigns WHERE status = 'running' AND warmup = 1")
   if (!rows.length) return []
-  const capacity = await dailyCapacity()
-  return rows.filter((r) => Number(r.sent) >= allowedBy(Math.floor((Date.now() - Number(r.started_at)) / DAY), capacity)).map((r) => Number(r.id))
+  const c = await planContext()
+  return c.usedToday >= dayLimit(c.warmDay, c.capacity, true) ? rows.map((r) => Number(r.id)) : []
 }
 
 /** A list going bad hurts the domain for good, so a running campaign stops itself in time. */

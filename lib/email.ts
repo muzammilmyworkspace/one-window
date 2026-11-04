@@ -1,4 +1,5 @@
 import { unsubToken } from './auth'
+import { stateName } from './lists'
 import type { Settings } from './settings'
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
@@ -7,7 +8,7 @@ export interface Person { email: string; first_name?: string; last_name?: string
 
 function fill(str: string, c: Person, html: boolean): string {
   const first = (c.first_name || '').trim().split(/\s+/)[0] || ''
-  const vals: Record<string, string> = { first_name: first || 'there', last_name: c.last_name || '', state: c.state || '', company: c.company || 'your business', email: c.email }
+  const vals: Record<string, string> = { first_name: first || 'there', last_name: c.last_name || '', state: c.state || '', state_name: stateName(c.state || '') || 'your state', company: c.company || 'your business', email: c.email }
   return str.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in vals ? (html ? esc(vals[k]) : vals[k]) : m))
 }
 

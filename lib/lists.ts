@@ -12,3 +12,8 @@ export const listLabel = (name: string) => LABELS[name] || name
 export const BUSINESS_REASON = "We're reaching out because your business contact details are publicly listed. We have not worked with you before."
 export const reasonFor = (list: string) => (list.startsWith('business') ? BUSINESS_REASON : '')
 export const followupFor = (list: string) => (list.startsWith('business') ? 'b2' : 'email2')
+
+const STATES: Record<string, string> = {
+  AL: 'Alabama', FL: 'Florida', GA: 'Georgia', IL: 'Illinois', LA: 'Louisiana', MS: 'Mississippi', NC: 'North Carolina', TX: 'Texas',
+}
+export const stateName = (code: string) => STATES[code] || code
