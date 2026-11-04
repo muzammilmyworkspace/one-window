@@ -2,30 +2,33 @@ import Link from 'next/link'
 import { ImportButton, StatusToggle } from '@/components/ContactActions'
 import { Empty, Icon, PageHead, Stat, StatusBadge } from '@/components/ui'
 import { all, one } from '@/lib/db'
+import { listLabel } from '@/lib/lists'
 
 const PAGE = 50
 
-export default async function Contacts({ searchParams }: { searchParams: Promise<{ q?: string; state?: string; status?: string; p?: string }> }) {
+export default async function Contacts({ searchParams }: { searchParams: Promise<{ q?: string; state?: string; status?: string; list?: string; p?: string }> }) {
   const sp = await searchParams
-  const q = (sp.q || '').trim(), state = sp.state || '', status = sp.status || ''
+  const q = (sp.q || '').trim(), state = sp.state || '', status = sp.status || '', list = sp.list || ''
   const page = Math.max(1, Number(sp.p) || 1)
 
   const conds: string[] = [], args: (string | number)[] = []
   if (q) { conds.push("(email LIKE ? OR first_name LIKE ? OR last_name LIKE ? OR first_name || ' ' || last_name LIKE ?)"); args.push(...Array(4).fill(`%${q}%`)) }
   if (state) { conds.push('state = ?'); args.push(state) }
   if (status) { conds.push('status = ?'); args.push(status) }
+  if (list) { conds.push('list_name = ?'); args.push(list) }
   const where = conds.length ? `WHERE ${conds.join(' AND ')}` : ''
 
-  const [rows, match, byStatus, states] = await Promise.all([
+  const [rows, match, byStatus, states, lists] = await Promise.all([
     all(`SELECT * FROM contacts ${where} ORDER BY state, last_name, first_name LIMIT ? OFFSET ?`, [...args, PAGE, (page - 1) * PAGE]),
     one<{ n: number }>(`SELECT COUNT(*) n FROM contacts ${where}`, args),
     all('SELECT status, COUNT(*) n FROM contacts GROUP BY status'),
     all("SELECT state, COUNT(*) n FROM contacts WHERE state != '' GROUP BY state ORDER BY state"),
+    all('SELECT list_name, COUNT(*) n FROM contacts GROUP BY list_name ORDER BY n DESC'),
   ])
   const n = (s: string) => Number(byStatus.find((b) => b.status === s)?.n || 0)
   const total = byStatus.reduce((a, b) => a + Number(b.n), 0)
   const pages = Math.max(1, Math.ceil(Number(match?.n || 0) / PAGE))
-  const link = (p: number) => `/contacts?${new URLSearchParams({ q, state, status, p: String(p) })}`
+  const link = (p: number) => `/contacts?${new URLSearchParams({ q, state, status, list, p: String(p) })}`
 
   return (
     <>
@@ -44,6 +47,10 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
       <section className="card overflow-hidden">
         <form className="flex flex-wrap gap-2 border-b border-line p-3" role="search">
           <input name="q" defaultValue={q} aria-label="Search" placeholder="Search name or email" className="field min-w-[200px] flex-1" />
+          <select name="list" defaultValue={list} aria-label="List" className="field w-auto">
+            <option value="">All lists</option>
+            {lists.map((l) => <option key={l.list_name} value={l.list_name}>{listLabel(String(l.list_name))} ({Number(l.n).toLocaleString()})</option>)}
+          </select>
           <select name="state" defaultValue={state} aria-label="State" className="field w-auto">
             <option value="">All states</option>
             {states.map((s) => <option key={s.state} value={s.state}>{s.state} ({Number(s.n).toLocaleString()})</option>)}
@@ -62,13 +69,14 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
           </Empty>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
-              <thead><tr><th className="th">Name</th><th className="th">Email</th><th className="th">State</th><th className="th">Status</th><th className="th" /></tr></thead>
+            <table className="w-full min-w-[760px]">
+              <thead><tr><th className="th">Name</th><th className="th">Email</th><th className="th">List</th><th className="th">State</th><th className="th">Status</th><th className="th" /></tr></thead>
               <tbody>
                 {rows.map((c) => (
                   <tr key={c.id} className="hover:bg-page">
                     <td className="td font-semibold">{`${c.first_name} ${c.last_name}`.trim() || <span className="text-ink-3">No name</span>}</td>
                     <td className="td text-ink-2">{c.email}</td>
+                    <td className="td text-[13px] text-ink-2">{listLabel(String(c.list_name))}</td>
                     <td className="td">{c.state || '–'}</td>
                     <td className="td"><StatusBadge status={c.status} /></td>
                     <td className="td text-right"><StatusToggle id={Number(c.id)} status={String(c.status)} /></td>

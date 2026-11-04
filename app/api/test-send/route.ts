@@ -7,12 +7,13 @@ export const POST = route(async (req: Request) => {
   const b = await req.json()
   const to = String(b.to || '').trim()
   if (!EMAIL_RE.test(to)) return fail('Enter a valid email address')
-  const provider: ProviderName = b.provider === 'resend' ? 'resend' : 'brevo'
+  // whichever sender is connected
+  const provider: ProviderName = missingCreds('brevo').length ? 'resend' : 'brevo'
   if (!isLive()) return json({ ok: true, message: 'Practice mode: the test was built but not sent.' })
   const miss = missingCreds(provider)
   if (miss.length) return fail(`${provider} is not connected yet (${miss.join(', ')})`)
   const s = await getSettings()
-  const mail = await renderEmail({ subject: b.subject, html: b.html, preheader: b.preheader }, { email: to, first_name: b.first_name || 'Friend' }, s)
+  const mail = await renderEmail({ subject: b.subject, html: b.html, preheader: b.preheader, reason: b.reason }, { email: to, first_name: b.first_name || 'Friend', company: 'Your Company' }, s)
   try {
     await deliver(provider, {
       from: `"${s.from_name}" <${s.from_email}>`, to, replyTo: s.reply_to,

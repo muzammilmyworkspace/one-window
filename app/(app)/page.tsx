@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { all, getKv, one } from '@/lib/db'
 import { campaignStats, dailySends } from '@/lib/engine'
+import { byListOrder, listLabel } from '@/lib/lists'
 import { batches } from '@/lib/plan'
 import { missingCreds, PROVIDER_LABEL, providers, usedToday } from '@/lib/providers'
 import { Empty, Icon, Meter, Notice, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
@@ -12,10 +13,17 @@ export default async function Dashboard() {
     campaignStats(), dailySends(), providers(),
     one("SELECT * FROM campaigns WHERE status IN ('running','paused') ORDER BY started_at LIMIT 1"),
     all("SELECT r.*, c.name campaign FROM replies r LEFT JOIN campaigns c ON c.id = r.campaign_id WHERE r.kind IN ('reply','unsubscribe') ORDER BY r.received_at DESC LIMIT 6"),
-    all('SELECT status, COUNT(*) n FROM contacts GROUP BY status'),
+    all('SELECT list_name, status, COUNT(*) n FROM contacts GROUP BY list_name, status'),
     getKv('webhooks_seen'),
   ])
-  const count = (s: string) => Number(contacts.find((c) => c.status === s)?.n || 0)
+  const count = (s: string) => contacts.filter((c) => c.status === s).reduce((a, c) => a + Number(c.n), 0)
+  const lists = [...new Set(contacts.map((c) => String(c.list_name)))].map((l) => ({
+    name: l,
+    total: contacts.filter((c) => c.list_name === l).reduce((a, c) => a + Number(c.n), 0),
+    active: Number(contacts.find((c) => c.list_name === l && c.status === 'active')?.n || 0),
+  })).sort((a, b) => byListOrder(a.name, b.name))
+  const reached = await one<{ n: number }>('SELECT COUNT(DISTINCT contact_id) n FROM sends WHERE sent_at IS NOT NULL')
+  const notYet = Math.max(0, count('active') - Number(reached?.n || 0))
   const total = contacts.reduce((a, c) => a + Number(c.n), 0)
   const usage = await Promise.all(provs.map(async (p) => ({ ...p, used: await usedToday(p.name), missing: missingCreds(p.name) })))
   const capacity = usage.filter((p) => p.enabled && !p.missing.length).reduce((a, p) => a + Number(p.daily_cap), 0)
@@ -50,8 +58,18 @@ export default async function Dashboard() {
         </section>
       )}
 
+      <section aria-label="Your emails" className="mb-5">
+        <h2 className="mb-3 text-base">Your emails</h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <Stat label="Total emails" value={total} sub={`${count('active').toLocaleString()} can be emailed`} />
+          {lists.map((l) => <Stat key={l.name} label={listLabel(l.name)} value={l.total} sub={`${l.active.toLocaleString()} active`} />)}
+          <Stat label="Not emailed yet" value={notYet} sub="Still waiting for a first email" />
+        </div>
+      </section>
+
+      <h2 className="mb-3 text-base">Results</h2>
       <section aria-label="Totals" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Stat label="Sent" value={stats.sent} sub={`${total.toLocaleString()} contacts in total`} />
+        <Stat label="Sent" value={stats.sent} sub="Emails sent so far" />
         <Stat label="Replies" value={stats.replied} sub={`${pct(stats.replied, stats.sent)} of sent`} />
         <Stat label="Delivered" value={seen ? stats.delivered : '–'} sub={none || `${pct(stats.delivered, stats.sent)} of sent`} />
         <Stat label="Opened" value={seen ? stats.opened : '–'} sub={none || `${pct(stats.opened, stats.sent)} of sent`} />

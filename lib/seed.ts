@@ -1,3 +1,5 @@
+import { BUSINESS_REASON } from './lists'
+
 // The two starting emails. Header, footer and layout are added when the email is built.
 const G = '#0E9F6E', INK = '#17302A', SOFT = '#E9F7F1'
 
@@ -15,10 +17,11 @@ const btn = (label: string, utm: string) =>
 const phone = `<a href="tel:+18722171852" style="color:${G};font-weight:bold;text-decoration:none;">(872) 217-1852</a>`
 const row = (mark: string, title: string, text: string) =>
   `<tr><td width="42" valign="top" style="padding:0 0 16px;"><div style="width:30px;height:30px;line-height:30px;text-align:center;background:${G};border-radius:15px;color:#ffffff;font-size:14px;font-weight:bold;">${mark}</div></td>
-<td valign="top" style="padding:0 0 16px;"><strong style="color:${INK};">${title}</strong><br>${text}</td></tr>`
+<td valign="top" style="padding:0 0 16px;">${title ? `<strong style="color:${INK};">${title}</strong><br>` : ''}${text}</td></tr>`
+const heading = (t: string) => `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">${t}</p>`
 const rows = (inner: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">${inner}</table>`
 
-const BUSINESS_REASON = "We're reaching out because your business contact details are publicly listed. We have not worked with you before."
+export const emailBlocks = { p, h1, box, btn, row, rows, heading }
 
 export const TEMPLATES = [
   {

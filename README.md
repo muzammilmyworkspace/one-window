@@ -63,3 +63,7 @@ Kisi sender se 3 errors lagataar aayen to woh 1 ghanta rest karta hai aur doosra
 - Automatic follow-up: har shakhs ko us ki pehli email ke N din baad jata hai. Reply, bounce aur unsubscribe wale skip hote hain. Purani campaign ke page se bhi on ho sakta hai.
 - Yeh sab scheduler (cron-job.org) par chalta hai. Scheduler ke baghair sending sirf tab chalti hai jab tool khula ho.
 
+## Nayi campaign
+
+5 steps: Name, Recipients, Content, Test, Launch. Content step mein PDF, Word (.docx) ya .txt upload karein. Pehli line "Subject: ..." ho to subject wahan se aata hai, warna heading se. Logo, footer aur design wahi rehte hain. File 4 MB tak.
+

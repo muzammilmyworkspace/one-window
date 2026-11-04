@@ -2,7 +2,7 @@
 export default {
   poweredByHeader: false,
   devIndicators: false,
-  serverExternalPackages: ['@libsql/client', 'libsql', 'nodemailer', 'imapflow', 'mailparser', 'exceljs'],
+  serverExternalPackages: ['@libsql/client', 'libsql', 'nodemailer', 'imapflow', 'mailparser', 'exceljs', 'mammoth', 'unpdf'],
   async headers() {
     return [{ source: '/:path*', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

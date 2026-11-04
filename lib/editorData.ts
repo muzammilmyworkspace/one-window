@@ -10,7 +10,6 @@ export async function editorData() {
   ])
   return {
     stateCounts: states.map((s) => ({ list: String(s.list_name), state: String(s.state), n: Number(s.n) })),
-    previous: previous.map((p) => ({ id: Number(p.id), name: String(p.name), sent: Number(p.sent) })),
     live: isLive(),
     capacity,
   }
