@@ -14,3 +14,14 @@ export function setupProblems(): string[] {
   }
   return out
 }
+
+/** For Settings: which deployment and database this page runs on. Host name only, never a token. */
+export function deploymentInfo() {
+  const url = databaseUrl()
+  return {
+    environment: process.env.VERCEL_ENV || 'local',
+    database: url.startsWith('file:') ? 'local file' : url.replace(/^[a-z]+:\/\//, '').split('/')[0],
+    commit: (process.env.VERCEL_GIT_COMMIT_SHA || '').slice(0, 7),
+    mode: (process.env.SEND_MODE || '(not set)').trim(),
+  }
+}

@@ -29,4 +29,4 @@ export async function saveSettings(patch: Partial<Settings>) {
     if (typeof v === 'string') await setKv(`set:${k}`, v.trim())
   }
 }
-export const isLive = () => process.env.SEND_MODE === 'live'
+export const isLive = () => (process.env.SEND_MODE || '').trim().replace(/^["']|["']$/g, '').toLowerCase() === 'live'

@@ -4,6 +4,7 @@ import { getKv } from '@/lib/db'
 import { imapConfigured } from '@/lib/inbox'
 import { domainChecks, missingCreds, PROVIDER_LABEL, providers, usedToday } from '@/lib/providers'
 import { getSettings, isLive } from '@/lib/settings'
+import { deploymentInfo } from '@/lib/setup'
 
 function Check({ ok, label, help }: { ok: boolean; label: string; help: string }) {
   return (
@@ -22,12 +23,17 @@ export default async function SettingsPage() {
   const app = (process.env.APP_URL || '').replace(/\/$/, '')
   const secret = process.env.CRON_SECRET || ''
   const isPublic = app.startsWith('https')
+  const info = deploymentInfo()
 
   return (
     <>
       <PageHead title="Settings" sub="Connections, limits and what goes in every email.">
         {isLive() ? <Badge tone="good" icon="send">Live: real emails</Badge> : <Badge tone="warn" icon="pause">Practice mode</Badge>}
       </PageHead>
+
+      <p className="mb-5 rounded-lg border border-line bg-white px-4 py-2.5 font-mono text-[12.5px] text-ink-2">
+        environment: {info.environment} · SEND_MODE: {info.mode} · database: {info.database}{info.commit ? ` · build: ${info.commit}` : ''}
+      </p>
 
       <h2 className="mb-3 text-lg">Connections</h2>
       <div className="grid gap-4 md:grid-cols-3">
