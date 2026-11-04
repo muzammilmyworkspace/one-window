@@ -6,8 +6,8 @@ import { batches } from '@/lib/plan'
 import SendingPlan from './SendingPlan'
 import { Badge, Icon } from './ui'
 
-export interface Draft { id?: number; name: string; subject: string; preheader: string; html: string; states: string[]; follow_up_of: number | null; warmup: boolean }
-interface Template { key: string; label: string; name: string; subject: string; preheader: string; html: string }
+export interface Draft { id?: number; name: string; subject: string; preheader: string; html: string; states: string[]; follow_up_of: number | null; warmup: boolean; list_name: string; reason: string; followup_key: string; followup_days: number }
+interface Template { key: string; label: string; name: string; subject: string; preheader: string; html: string; list: string; reason: string; followup?: string }
 interface Option { id: number; name: string; sent: number }
 interface Check { label: string; ok: boolean; blocking: boolean; help: string }
 
@@ -18,7 +18,7 @@ const BUTTON = (label: string, href: string) =>
   `<p style="margin:0 0 20px;"><a href="${href}" style="display:inline-block;padding:14px 26px;background:#0E9F6E;border-radius:8px;color:#ffffff;text-decoration:none;font-weight:bold;">${label}</a></p>`
 
 export default function CampaignEditor(props: {
-  initial: Draft; templates: Template[]; stateCounts: { state: string; n: number }[]; previous: Option[]; live: boolean; capacity: number
+  initial: Draft; templates: Template[]; stateCounts: { list: string; state: string; n: number }[]; previous: Option[]; live: boolean; capacity: number
 }) {
   const router = useRouter()
   const [d, setD] = useState<Draft>(props.initial)
@@ -41,11 +41,11 @@ export default function CampaignEditor(props: {
 
   useEffect(() => {
     const t = setTimeout(async () => {
-      const r = await post('/api/preview', { subject: d.subject, preheader: d.preheader, html })
+      const r = await post('/api/preview', { subject: d.subject, preheader: d.preheader, html, reason: d.reason })
       if (r.ok) setPreview(await r.json())
     }, 350)
     return () => clearTimeout(t)
-  }, [d.subject, d.preheader, html])
+  }, [d.subject, d.preheader, d.reason, html])
 
   const set = (patch: Partial<Draft>) => setD((p) => ({ ...p, ...patch }))
   const sync = () => { if (editor.current) setHtml(editor.current.innerHTML) }
@@ -54,7 +54,7 @@ export default function CampaignEditor(props: {
   function useTemplate(key: string) {
     const t = props.templates.find((x) => x.key === key)
     if (!t) return
-    setD((p) => ({ ...p, name: t.name, subject: t.subject, preheader: t.preheader }))
+    setD((p) => ({ ...p, name: t.name, subject: t.subject, preheader: t.preheader, list_name: t.list, reason: t.reason, states: [], follow_up_of: null, followup_key: t.followup || '', followup_days: t.followup ? p.followup_days || 5 : 0 }))
     setHtml(t.html)
   }
 
@@ -117,7 +117,11 @@ export default function CampaignEditor(props: {
   }
 
   const toggleState = (s: string) => set({ states: d.states.includes(s) ? d.states.filter((x) => x !== s) : [...d.states, s] })
-  const audienceSum = d.states.length ? props.stateCounts.filter((s) => d.states.includes(s.state)).reduce((a, s) => a + s.n, 0) : props.stateCounts.reduce((a, s) => a + s.n, 0)
+  const lists = [...new Set(props.stateCounts.map((s) => s.list))]
+  if (!lists.includes(d.list_name)) lists.unshift(d.list_name)
+  const inList = props.stateCounts.filter((s) => s.list === d.list_name)
+  const audienceSum = (d.states.length ? inList.filter((s) => d.states.includes(s.state)) : inList).reduce((a, s) => a + s.n, 0)
+  const listSize = (l: string) => props.stateCounts.filter((s) => s.list === l).reduce((a, s) => a + s.n, 0)
   const previewPlan = batches(audienceSum, 0, props.capacity, d.warmup, Date.now())
   const confirmPlan = batches(confirm || 0, 0, props.capacity, d.warmup, Date.now())
 
@@ -190,16 +194,22 @@ export default function CampaignEditor(props: {
         <section className="card p-5">
           <h2 className="text-base">Who gets it</h2>
           <div className="mt-3">
+            <label htmlFor="c-list" className="label">List</label>
+            <select id="c-list" className="field" value={d.list_name} onChange={(e) => set({ list_name: e.target.value, states: [] })}>
+              {lists.map((l) => <option key={l} value={l}>{l} ({listSize(l).toLocaleString()})</option>)}
+            </select>
+          </div>
+          <div className="mt-4">
             <label htmlFor="c-follow" className="label">Audience</label>
             <select id="c-follow" className="field" value={d.follow_up_of ?? ''} onChange={(e) => set({ follow_up_of: e.target.value ? Number(e.target.value) : null })}>
-              <option value="">All active contacts</option>
+              <option value="">Everyone active in this list</option>
               {props.previous.map((p) => <option key={p.id} value={p.id}>Follow-up: {p.name} (no reply yet)</option>)}
             </select>
           </div>
           <div className="mt-4">
             <p className="label">States</p>
             <div className="flex flex-wrap gap-1.5">
-              {props.stateCounts.map((s) => {
+              {inList.map((s) => {
                 const on = d.states.includes(s.state)
                 return (
                   <button key={s.state || 'none'} type="button" aria-pressed={on} onClick={() => toggleState(s.state)}
@@ -211,6 +221,24 @@ export default function CampaignEditor(props: {
             </div>
             <p className="hint">None selected means every state.{!d.follow_up_of && ` ${audienceSum.toLocaleString()} people right now.`}</p>
           </div>
+        </section>
+
+        <section className="card p-5">
+          <label htmlFor="c-reason" className="label">Why they get this email</label>
+          <textarea id="c-reason" rows={3} className="field" value={d.reason} onChange={(e) => set({ reason: e.target.value })} placeholder="Empty uses the text from Settings" />
+          <p className="hint">Shown in the footer. It has to be true for everyone in this list.</p>
+          <label htmlFor="c-fu" className="label mt-4">Automatic follow-up</label>
+          <select id="c-fu" className="field" value={d.followup_key} onChange={(e) => set({ followup_key: e.target.value, followup_days: e.target.value ? d.followup_days || 5 : 0 })}>
+            <option value="">No follow-up</option>
+            {props.templates.filter((t) => t.key.includes('2') || t.key.endsWith('followup')).map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+          {d.followup_key && (
+            <>
+              <label htmlFor="c-fd" className="label mt-3">Days after each person&apos;s first email</label>
+              <input id="c-fd" type="number" min={1} max={30} className="field" value={d.followup_days} onChange={(e) => set({ followup_days: Number(e.target.value) })} />
+              <p className="hint">Goes out by itself. Anyone who replied, bounced or unsubscribed is skipped.</p>
+            </>
+          )}
         </section>
 
         <section className="card p-5">

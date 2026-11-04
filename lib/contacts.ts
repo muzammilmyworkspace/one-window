@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs'
 import { batch, one } from './db'
 import { EMAIL_RE } from './email'
 
-interface Raw { first: string; last: string; email: string; state: string }
+interface Raw { first: string; last: string; email: string; state: string; company: string; list: string }
 
 function csvRows(text: string): string[][] {
   const rows: string[][] = []
@@ -38,13 +38,14 @@ async function xlsxRows(buf: ArrayBuffer): Promise<string[][]> {
   return rows
 }
 
-function toContacts(rows: string[][]): { list: Raw[]; invalid: number } {
+function toContacts(rows: string[][], defaultList: string): { list: Raw[]; invalid: number } {
   if (!rows.length) throw new Error('The file is empty')
   const head = rows[0].map((h) => String(h || '').trim().toLowerCase())
   const col = (...names: string[]) => head.findIndex((h) => names.includes(h))
   const ce = col('email', 'e-mail', 'email address')
   if (ce < 0) throw new Error('No "Email" column found in the first row')
   const [cf, cl, cn, cs] = [col('first name', 'firstname', 'first'), col('last name', 'lastname', 'last'), col('name', 'full name'), col('state')]
+  const [cc, cli] = [col('company', 'organization'), col('list')]
   const list: Raw[] = []
   let invalid = 0
   for (const r of rows.slice(1)) {
@@ -58,27 +59,27 @@ function toContacts(rows: string[][]): { list: Raw[]; invalid: number } {
       first = parts[0]
       last = parts.slice(1).join(' ')
     }
-    list.push({ email, first: first.trim(), last: last.trim(), state: String(cs >= 0 ? r[cs] || '' : '').trim().toUpperCase() })
+    list.push({ email, first: first.trim(), last: last.trim(), state: String(cs >= 0 ? r[cs] || '' : '').trim().toUpperCase(), company: String(cc >= 0 ? r[cc] || '' : '').trim(), list: String(cli >= 0 ? r[cli] || '' : '').trim().toLowerCase() || defaultList })
   }
   return { list, invalid }
 }
 
 /** Adds new contacts. An address already here is left untouched, so an unsubscribe stays. */
-export async function importContacts(name: string, buf: ArrayBuffer) {
+export async function importContacts(name: string, buf: ArrayBuffer, defaultList = 'clients') {
   const lower = name.toLowerCase()
   let rows: string[][]
   if (lower.endsWith('.xlsx')) rows = await xlsxRows(buf)
   else if (lower.endsWith('.csv')) rows = csvRows(new TextDecoder().decode(buf).replace(/^﻿/, ''))
   else throw new Error('Please upload an .xlsx or .csv file')
-  const { list, invalid } = toContacts(rows)
+  const { list, invalid } = toContacts(rows, defaultList)
 
   const count = async () => Number((await one<{ n: number }>('SELECT COUNT(*) n FROM contacts'))?.n || 0)
   const before = await count()
   const now = Date.now()
   for (let i = 0; i < list.length; i += 200) {
     await batch(list.slice(i, i + 200).map((c) => ({
-      sql: 'INSERT OR IGNORE INTO contacts (email, first_name, last_name, state, created_at) VALUES (?, ?, ?, ?, ?)',
-      args: [c.email, c.first, c.last, c.state, now],
+      sql: 'INSERT OR IGNORE INTO contacts (email, first_name, last_name, state, company, list_name, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      args: [c.email, c.first, c.last, c.state, c.company, c.list, now],
     })))
   }
   const added = (await count()) - before

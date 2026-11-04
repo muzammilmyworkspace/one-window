@@ -3,11 +3,11 @@ import type { Settings } from './settings'
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
 
-export interface Person { email: string; first_name?: string; last_name?: string; state?: string }
+export interface Person { email: string; first_name?: string; last_name?: string; state?: string; company?: string }
 
 function fill(str: string, c: Person, html: boolean): string {
   const first = (c.first_name || '').trim().split(/\s+/)[0] || ''
-  const vals: Record<string, string> = { first_name: first || 'there', last_name: c.last_name || '', state: c.state || '', email: c.email }
+  const vals: Record<string, string> = { first_name: first || 'there', last_name: c.last_name || '', state: c.state || '', company: c.company || 'your business', email: c.email }
   return str.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in vals ? (html ? esc(vals[k]) : vals[k]) : m))
 }
 
@@ -27,7 +27,7 @@ export function toText(html: string): string {
 }
 
 /** The body the user writes, wrapped in the layout and the legally required footer. */
-export async function renderEmail(c: { subject: string; html: string; preheader?: string }, person: Person, s: Settings) {
+export async function renderEmail(c: { subject: string; html: string; preheader?: string; reason?: string }, person: Person, s: Settings) {
   const url = `${(process.env.APP_URL || '').replace(/\/$/, '')}/u/${await unsubToken(person.email)}`
   const body = fill(c.html, person, true)
   const pre = c.preheader ? fill(c.preheader, person, true) : ''
@@ -50,7 +50,7 @@ ${social ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>${soc
 </td></tr>
 <tr><td style="padding:18px 30px 24px;font-size:12px;line-height:1.5;color:#6b7a73;text-align:center;">
 <p style="margin:0 0 8px;">${esc(s.disclosure)}</p>
-<p style="margin:0 0 8px;">${esc(s.reason)} Don't want these emails? <a href="${url}" style="color:#6b7a73;">Unsubscribe</a> or reply "unsubscribe".</p>
+<p style="margin:0 0 8px;">${esc(c.reason || s.reason)} Don't want these emails? <a href="${url}" style="color:#6b7a73;">Unsubscribe</a> or reply "unsubscribe".</p>
 <p style="margin:0;">${esc(s.address)}</p>
 </td></tr></table></td></tr></table></body></html>`
   return {

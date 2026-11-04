@@ -1,6 +1,6 @@
 import { fail, json, route } from '@/lib/api'
 import { one, run } from '@/lib/db'
-import { audienceCount, campaignStats, duplicateCampaign, retryFailed, startCampaign } from '@/lib/engine'
+import { attachFollowup, audienceCount, campaignStats, duplicateCampaign, retryFailed, startCampaign } from '@/lib/engine'
 import { preflight } from '@/lib/preflight'
 
 type Ctx = { params: Promise<{ id: string }> }
@@ -15,15 +15,16 @@ export const PUT = route(async (req: Request, ctx: Ctx) => {
   const id = Number((await ctx.params).id)
   const b = await req.json()
   if (!String(b.name || '').trim() || !String(b.subject || '').trim() || !String(b.html || '').trim()) return fail('Name, subject and body are required')
-  const r = await run("UPDATE campaigns SET name = ?, subject = ?, preheader = ?, html = ?, states = ?, follow_up_of = ?, warmup = ? WHERE id = ? AND status = 'draft'",
-    [b.name.trim(), b.subject.trim(), String(b.preheader || '').trim(), b.html, (b.states || []).join(','), b.follow_up_of ? Number(b.follow_up_of) : null, b.warmup ? 1 : 0, id])
+  const r = await run("UPDATE campaigns SET name = ?, subject = ?, preheader = ?, html = ?, states = ?, follow_up_of = ?, warmup = ?, list_name = ?, reason = ?, followup_key = ?, followup_days = ? WHERE id = ? AND status = 'draft'",
+    [b.name.trim(), b.subject.trim(), String(b.preheader || '').trim(), b.html, (b.states || []).join(','), b.follow_up_of ? Number(b.follow_up_of) : null, b.warmup ? 1 : 0, b.list_name || 'clients', String(b.reason || '').trim(), b.followup_key || '', Math.max(0, Number(b.followup_days) || 0), id])
   if (!r.changes) return fail('Only a draft can be edited')
   return json({ ok: true })
 })
 
 export const POST = route(async (req: Request, ctx: Ctx) => {
   const id = Number((await ctx.params).id)
-  const { action } = await req.json()
+  const { action, key, days } = await req.json()
+  if (action === 'followup') { await attachFollowup(id, String(key), Number(days) || 5); return json({ ok: true }) }
   if (action === 'start') return json({ queued: await startCampaign(id) })
   if (action === 'pause') await run("UPDATE campaigns SET status = 'paused' WHERE id = ? AND status = 'running'", [id])
   else if (action === 'resume') {

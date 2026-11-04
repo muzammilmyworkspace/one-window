@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import CampaignButtons from '@/components/CampaignButtons'
 import CampaignEditor from '@/components/CampaignEditor'
+import FollowupSetup from '@/components/FollowupSetup'
 import { Empty, Icon, Meter, Notice, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
 import { all, one } from '@/lib/db'
 import { renderEmail } from '@/lib/email'
@@ -32,7 +33,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <PageHead title={String(c.name)} sub={<Link href="/campaigns" className="hover:underline">Back to campaigns</Link>} />
         <CampaignEditor {...await editorData()} templates={TEMPLATES} initial={{
           id, name: String(c.name), subject: String(c.subject), preheader: String(c.preheader), html: String(c.html),
-          states: String(c.states).split(',').filter(Boolean), follow_up_of: c.follow_up_of ? Number(c.follow_up_of) : null, warmup: !!c.warmup,
+          states: String(c.states).split(',').filter(Boolean), follow_up_of: c.follow_up_of ? Number(c.follow_up_of) : null, warmup: !!c.warmup, list_name: String(c.list_name), reason: String(c.reason), followup_key: String(c.followup_key), followup_days: Number(c.followup_days),
         }} />
       </>
     )
@@ -45,9 +46,10 @@ export default async function CampaignPage({ params, searchParams }: { params: P
     campaignStats(id),
     all(`SELECT s.*, ct.first_name, ct.last_name, ct.state FROM sends s JOIN contacts ct ON ct.id = s.contact_id WHERE ${where} ORDER BY COALESCE(s.sent_at, 0) DESC, s.id LIMIT ? OFFSET ?`, [id, PAGE, (page - 1) * PAGE]),
     one<{ n: number }>(`SELECT COUNT(*) n FROM sends s WHERE ${where}`, [id]),
-    renderEmail({ subject: String(c.subject), html: String(c.html), preheader: String(c.preheader) }, { email: 'sarah@example.com', first_name: 'Sarah', last_name: 'Johnson', state: 'TX' }, await getSettings()),
+    renderEmail({ subject: String(c.subject), html: String(c.html), preheader: String(c.preheader), reason: String(c.reason) }, { email: 'sarah@example.com', first_name: 'Sarah', last_name: 'Johnson', state: 'TX', company: 'Johnson Consulting' }, await getSettings()),
   ])
   const pages = Math.max(1, Math.ceil(Number(count?.n || 0) / PAGE))
+  const child = await one('SELECT id, name, followup_days FROM campaigns WHERE follow_up_of = ? AND auto_child = 1', [id])
   const plan = batches(stats.total, stats.sent, await dailyCapacity(), !!c.warmup, Number(c.started_at))
   const link = (nf: string, p = 1) => `/campaigns/${id}?f=${nf}&p=${p}`
 
@@ -106,10 +108,23 @@ export default async function CampaignPage({ params, searchParams }: { params: P
           )}
         </section>
         <div className="space-y-5 self-start">
-        <section className="card p-4">
-          <h2 className="mb-3 text-base">Sending plan</h2>
-          <SendingPlan batches={plan} started />
-        </section>
+        {c.auto_child ? (
+          <section className="card p-4 text-sm text-ink-2">
+            <h2 className="mb-1 text-base text-ink">Automatic follow-up</h2>
+            Goes to each person {Number(c.followup_days)} days after their first email, unless they replied, bounced or unsubscribed.
+          </section>
+        ) : (
+          <section className="card p-4">
+            <h2 className="mb-3 text-base">Sending plan</h2>
+            <SendingPlan batches={plan} started />
+            <div className="mt-4 border-t border-line pt-4">
+              <h3 className="mb-2 text-sm">Automatic follow-up</h3>
+              {child ? (
+                <p className="text-sm text-ink-2">On: <Link href={`/campaigns/${child.id}`} className="font-semibold text-brand-dark hover:underline">{Number(child.followup_days)} days after each email</Link></p>
+              ) : <FollowupSetup id={id} templates={TEMPLATES.filter((t) => t.key.includes('2') || t.key.endsWith('followup')).map((t) => ({ key: t.key, label: t.label }))} initial={String(c.list_name).startsWith('business') ? 'b2' : 'email2'} />}
+            </div>
+          </section>
+        )}
         <section className="card overflow-hidden">
           <div className="border-b border-line p-4">
             <h2 className="flex items-center gap-2 text-base"><Icon name="send" size={16} /> The email</h2>

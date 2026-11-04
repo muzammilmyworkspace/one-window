@@ -13,7 +13,7 @@ export function classify(m: { from: string; subject: string; text: string; heade
   if ((auto && auto !== 'no') || /out of (the )?office|automatic reply|auto.?reply|vacation/i.test(m.subject)) return 'auto'
   const firstLines = m.text.split(/\r?\n/).filter((l) => l.trim() && !l.startsWith('>')).slice(0, 3).join(' ').slice(0, 300)
   const said = `${m.subject.replace(/^(re|fwd?):.*$/i, '')} ${firstLines}`.trim()
-  if (/\bunsubscribe\b|\bremove me\b|\bstop (emailing|sending|contacting)\b|^stop\b/i.test(said)) return 'unsubscribe'
+  if (/\bunsubscribe\b|\bremove me\b|\bno thanks\b|\bnot interested\b|\bstop (emailing|sending|contacting)\b|^stop\b/i.test(said)) return 'unsubscribe'
   return 'reply'
 }
 

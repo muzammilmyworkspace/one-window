@@ -96,6 +96,13 @@ const COLUMNS = [
   'ALTER TABLE campaigns ADD COLUMN safety_ack INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE sends ADD COLUMN complained_at INTEGER',
   'ALTER TABLE campaigns ADD COLUMN warmup INTEGER NOT NULL DEFAULT 0',
+  "ALTER TABLE contacts ADD COLUMN list_name TEXT NOT NULL DEFAULT 'clients'",
+  "ALTER TABLE contacts ADD COLUMN company TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE campaigns ADD COLUMN list_name TEXT NOT NULL DEFAULT 'clients'",
+  "ALTER TABLE campaigns ADD COLUMN reason TEXT NOT NULL DEFAULT ''",
+  "ALTER TABLE campaigns ADD COLUMN followup_key TEXT NOT NULL DEFAULT ''",
+  'ALTER TABLE campaigns ADD COLUMN followup_days INTEGER NOT NULL DEFAULT 0',
+  'ALTER TABLE campaigns ADD COLUMN auto_child INTEGER NOT NULL DEFAULT 0',
 ]
 
 function client(): Client {

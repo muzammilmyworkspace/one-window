@@ -1,6 +1,7 @@
 import { all, batch, getKv, lease, one, release, run, setKv } from './db'
 import { dailyCapacity, deliver, noteError, noteOk, pickProvider } from './providers'
 import { allowedBy } from './plan'
+import { TEMPLATES } from './seed'
 import { renderEmail } from './email'
 import { getSettings, isLive } from './settings'
 import { preflight } from './preflight'
@@ -10,10 +11,11 @@ const INBOX_EVERY = 2 * 60 * 1000
 const DAY = 24 * 3600 * 1000
 export const SAFETY = { bounce: 0.05, minBounce: 50, complaint: 0.003, minComplaint: 100, ackStep: 3 }
 
-function audience(c: { states?: unknown; follow_up_of?: unknown }) {
+function audience(c: { states?: unknown; follow_up_of?: unknown; list_name?: unknown }) {
   const states = String(c.states || '').split(',').filter(Boolean)
   const args: (string | number)[] = []
   let where = "c.status = 'active'"
+  if (c.list_name && !c.follow_up_of) { where += ' AND c.list_name = ?'; args.push(String(c.list_name)) }
   if (states.length) { where += ` AND c.state IN (${states.map(() => '?').join(',')})`; args.push(...states) }
   if (c.follow_up_of) {
     where += ' AND c.id IN (SELECT contact_id FROM sends WHERE campaign_id = ? AND sent_at IS NOT NULL AND replied_at IS NULL AND bounced_at IS NULL)'
@@ -21,7 +23,7 @@ function audience(c: { states?: unknown; follow_up_of?: unknown }) {
   }
   return { where, args }
 }
-export async function audienceCount(c: { states?: unknown; follow_up_of?: unknown }): Promise<number> {
+export async function audienceCount(c: { states?: unknown; follow_up_of?: unknown; list_name?: unknown }): Promise<number> {
   const { where, args } = audience(c)
   return Number((await one<{ n: number }>(`SELECT COUNT(*) n FROM contacts c WHERE ${where}`, args))?.n || 0)
 }
@@ -38,7 +40,31 @@ export async function startCampaign(id: number): Promise<number> {
   const r = await run(`INSERT OR IGNORE INTO sends (campaign_id, contact_id, email) SELECT ?, c.id, c.email FROM contacts c WHERE ${where}`, [id, ...args])
   if (!r.changes) throw new Error('Nobody matches this campaign')
   await run("UPDATE campaigns SET status = 'running', started_at = ? WHERE id = ?", [Date.now(), id])
+  if (c.followup_key && Number(c.followup_days) > 0) await attachFollowup(id, String(c.followup_key), Number(c.followup_days))
   return r.changes
+}
+
+/** Adds an automatic follow-up to a campaign, also one that has already gone out. */
+export async function attachFollowup(parentId: number, key: string, days: number) {
+  const t = TEMPLATES.find((x) => x.key === key)
+  const p = await one('SELECT * FROM campaigns WHERE id = ?', [parentId])
+  if (!t || !p) throw new Error('Follow-up template not found')
+  if (await one('SELECT 1 x FROM campaigns WHERE follow_up_of = ? AND auto_child = 1', [parentId])) throw new Error('This campaign already has an automatic follow-up')
+  await run(`INSERT INTO campaigns (name, subject, preheader, html, status, follow_up_of, list_name, reason, followup_days, auto_child, created_at, started_at)
+    VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, 1, ?, ?)`,
+    [`${p.name} (auto follow-up)`, t.subject, t.preheader, t.html, parentId, String(p.list_name), String(p.reason || ''), Math.max(1, days), Date.now(), Date.now()])
+}
+
+/** Queues the follow-up for everyone whose first email is old enough and who has not answered. */
+async function enqueueFollowups() {
+  if (Date.now() - Number((await getKv('followups_last')) || 0) < 5 * 60 * 1000) return
+  await setKv('followups_last', String(Date.now()))
+  for (const c of await all("SELECT id, follow_up_of, followup_days FROM campaigns WHERE auto_child = 1 AND status = 'running'")) {
+    await run(`INSERT OR IGNORE INTO sends (campaign_id, contact_id, email)
+      SELECT ?, s.contact_id, s.email FROM sends s JOIN contacts ct ON ct.id = s.contact_id
+      WHERE s.campaign_id = ? AND s.sent_at IS NOT NULL AND s.sent_at < ? AND s.replied_at IS NULL AND s.bounced_at IS NULL AND ct.status = 'active'`,
+      [Number(c.id), Number(c.follow_up_of), Date.now() - Number(c.followup_days) * DAY])
+  }
 }
 
 export interface TickResult { sent: number; running: boolean; waiting?: 'gap' | 'busy' | 'caps' | 'batch'; inbox?: number }
@@ -68,15 +94,18 @@ export async function tick(): Promise<TickResult> {
     await run("UPDATE sends SET status = 'queued' WHERE status = 'sending'")
 
     await safetyStop()
+    await enqueueFollowups()
     const held = await heldForBatch()
 
     const next = await one(`SELECT s.id, s.contact_id, s.attempts, ct.email, ct.first_name, ct.last_name, ct.state, ct.status contact_status,
-        cp.subject, cp.html, cp.preheader
+        ct.company, cp.subject, cp.html, cp.preheader, cp.reason
       FROM sends s JOIN campaigns cp ON cp.id = s.campaign_id JOIN contacts ct ON ct.id = s.contact_id
-      WHERE s.status = 'queued' AND cp.status = 'running'${held.length ? ` AND cp.id NOT IN (${held.join(',')})` : ''} ORDER BY cp.started_at, s.id LIMIT 1`)
+      WHERE s.status = 'queued' AND cp.status = 'running'${held.length ? ` AND cp.id NOT IN (${held.join(',')})` : ''} ORDER BY cp.auto_child DESC, cp.started_at, s.id LIMIT 1`)
     if (!next) {
       await run(`UPDATE campaigns SET status = 'completed', completed_at = ? WHERE status = 'running'
-        AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.campaign_id = campaigns.id AND s.status = 'queued')`, [Date.now()])
+        AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.campaign_id = campaigns.id AND s.status = 'queued')
+        AND (auto_child = 0 OR EXISTS (SELECT 1 FROM campaigns p WHERE p.id = campaigns.follow_up_of AND p.status = 'completed'
+          AND p.completed_at < ? - campaigns.followup_days * 86400000 - 3600000))`, [Date.now(), Date.now()])
       if (held.length) { out.running = true; out.waiting = 'batch' }
       return out
     }
@@ -93,7 +122,7 @@ export async function tick(): Promise<TickResult> {
     const messageId = `<${crypto.randomUUID()}@${domain}>`
     await run("UPDATE sends SET status = 'sending', attempts = attempts + 1 WHERE id = ?", [next.id])
     try {
-      const mail = await renderEmail({ subject: next.subject, html: next.html, preheader: next.preheader }, next as never, settings)
+      const mail = await renderEmail({ subject: next.subject, html: next.html, preheader: next.preheader, reason: next.reason }, next as never, settings)
       await deliver(provider.name, { from: `"${settings.from_name}" <${settings.from_email}>`, to: next.email, replyTo: settings.reply_to, messageId, ...mail })
       await run("UPDATE sends SET status = 'sent', provider = ?, message_id = ?, sent_at = ?, last_error = NULL WHERE id = ?", [provider.name, messageId, Date.now(), next.id])
       await noteOk(provider.name)
@@ -169,8 +198,8 @@ export async function retryFailed(id: number): Promise<number> {
 export async function duplicateCampaign(id: number): Promise<number> {
   const c = await one('SELECT * FROM campaigns WHERE id = ?', [id])
   if (!c) throw new Error('Campaign not found')
-  const r = await run('INSERT INTO campaigns (name, subject, preheader, html, states, follow_up_of, warmup, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [`${c.name} (copy)`, c.subject as string, c.preheader as string, c.html as string, c.states as string, (c.follow_up_of ?? null) as number | null, Number(c.warmup), Date.now()])
+  const r = await run('INSERT INTO campaigns (name, subject, preheader, html, states, follow_up_of, warmup, list_name, reason, followup_key, followup_days, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [`${c.name} (copy)`, c.subject as string, c.preheader as string, c.html as string, c.states as string, (c.follow_up_of ?? null) as number | null, Number(c.warmup), c.list_name as string, c.reason as string, c.followup_key as string, Number(c.followup_days), Date.now()])
   return r.id
 }
 

@@ -18,9 +18,14 @@ const row = (mark: string, title: string, text: string) =>
 <td valign="top" style="padding:0 0 16px;"><strong style="color:${INK};">${title}</strong><br>${text}</td></tr>`
 const rows = (inner: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">${inner}</table>`
 
+const BUSINESS_REASON = "We're reaching out because your business contact details are publicly listed. We have not worked with you before."
+
 export const TEMPLATES = [
   {
     key: 'email1',
+    list: 'clients',
+    reason: '',
+    followup: 'email2',
     label: 'Email 1: 2027 costs',
     name: 'Open Enrollment, Email 1',
     subject: '{{first_name}}, your 2027 health plan may cost more. Check before it renews',
@@ -44,6 +49,8 @@ export const TEMPLATES = [
   },
   {
     key: 'email2',
+    list: 'clients',
+    reason: '',
     label: 'Email 2: Follow-up',
     name: 'Open Enrollment, Email 2 (follow-up)',
     subject: '{{first_name}}, want coverage from January 1? Enroll by December 15',
@@ -63,6 +70,51 @@ export const TEMPLATES = [
       ].join('\n')),
       p('A licensed agent can go through all of this with you in about 15 minutes. Free, and no obligation to enroll.'),
       btn('Get my free plan review', 'oe2027_email2'),
+      `<p style="margin:0 0 20px;text-align:center;">Or call ${phone}.</p>`,
+      p('Thanks,<br><strong>The Support Life team</strong>'),
+    ].join('\n'),
+  },
+  {
+    key: 'b1',
+    list: 'business',
+    reason: BUSINESS_REASON,
+    followup: 'b2',
+    label: 'Business 1: Owners',
+    name: 'Business owners, Email 1',
+    subject: '{{first_name}}, is your 2027 health coverage sorted?',
+    preheader: 'If you buy your own coverage, Open Enrollment runs until January 15.',
+    html: [
+      h1('Health coverage when you work for yourself'),
+      p('Hi {{first_name}},'),
+      p('If you run {{company}} and buy your own health insurance, Open Enrollment for 2027 is open now. It is worth a look before your plan renews.'),
+      box('Open Enrollment ends', 'January 15, 2027'),
+      `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">Why it matters for owners</p>`,
+      rows([
+        row('1', 'Your income drives your savings.', 'Savings depend on your household and your expected yearly income, so owners with uneven income should estimate carefully.'),
+        row('2', 'Prices are moving.', "KFF's review of 276 insurers found a median proposed increase of about 15% for 2027."),
+        row('3', 'The monthly price is only part of it.', 'Deductibles, copays and which doctors are covered matter just as much.'),
+      ].join('\n')),
+      p("We can connect you with a licensed agent who will compare your options with you. It's free, and there's no obligation to enroll."),
+      btn('Check my 2027 options', 'oe2027_business1'),
+      `<p style="margin:0 0 20px;text-align:center;">Prefer to talk? Call ${phone} or just reply to this email.</p>`,
+      p('Thanks,<br><strong>The Support Life team</strong>'),
+    ].join('\n'),
+  },
+  {
+    key: 'b2',
+    list: 'business',
+    reason: BUSINESS_REASON,
+    label: 'Business 2: Follow-up',
+    name: 'Business owners, Email 2 (follow-up)',
+    subject: '{{first_name}}, quick follow-up on your 2027 coverage',
+    preheader: 'A 15-minute call with a licensed agent. Free, no obligation.',
+    html: [
+      h1('Still comparing 2027 coverage?'),
+      p('Hi {{first_name}},'),
+      p('A quick follow-up on my last note. If you buy your own coverage and want it to start on January 1, there is one date to remember.'),
+      box('Marketplace deadline for January 1 coverage', 'December 15'),
+      p('A licensed agent can go through your options with you in about 15 minutes. Free, and no obligation to enroll. Not relevant for you? Just reply "no thanks" and we will stop.'),
+      btn('Get my free plan review', 'oe2027_business2'),
       `<p style="margin:0 0 20px;text-align:center;">Or call ${phone}.</p>`,
       p('Thanks,<br><strong>The Support Life team</strong>'),
     ].join('\n'),

@@ -55,3 +55,11 @@ Kisi sender se 3 errors lagataar aayen to woh 1 ghanta rest karta hai aur doosra
 - Live start se pehle checks: contacts, sender, DNS, DMARC, https, postal address. Koi zaroori check fail ho to campaign start nahi hoti.
 - Bounce 5% se upar (50 emails ke baad) ya spam complaints 0.3% se upar (100 emails ke baad): campaign khud pause ho jati hai.
 - Bad address par email dobara nahi jati. Unsubscribe hamesha ke liye hai.
+
+## Lists aur automation
+
+- Excel mein `List` aur `Company` columns ho sakte hain. Har campaign ek hi list ko jati hai, aur footer mein har campaign ka apna "why they get this email" hota hai.
+- Warm up: 100, 200, 300 emails roz, phir poori capacity. Campaign page par har batch ki progress dikhti hai.
+- Automatic follow-up: har shakhs ko us ki pehli email ke N din baad jata hai. Reply, bounce aur unsubscribe wale skip hote hain. Purani campaign ke page se bhi on ho sakta hai.
+- Yeh sab scheduler (cron-job.org) par chalta hai. Scheduler ke baghair sending sirf tab chalti hai jab tool khula ho.
+
