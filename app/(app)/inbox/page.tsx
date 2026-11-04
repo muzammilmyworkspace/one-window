@@ -37,6 +37,7 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
   return (
     <>
       <PageHead title="Inbox" sub={<>Replies from people you emailed. Every one is also in {settings.reply_to}{synced ? `. Checked ${when(Number(synced))}` : ''}.</>}>
+        <a href="/api/export?type=replied" className="btn btn-ghost"><Icon name="download" size={15} /> Export for sales</a>
         <SyncButton disabled={!connected} />
       </PageHead>
 

@@ -55,7 +55,7 @@ export default async function Dashboard() {
         <h2 className="mb-3 text-base">Your emails</h2>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
           <Stat label="Total emails" value={total} sub="All contacts" />
-          <Stat label="Ready to email" value={count('active')} sub="Not unsubscribed or bounced" />
+          <Stat label="Ready to email" value={count('active')} sub="Not replied, unsubscribed or bounced" />
           <Stat label="Not emailed yet" value={notYet} sub="Still waiting for a first email" />
         </div>
       </section>

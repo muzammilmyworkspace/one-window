@@ -18,6 +18,13 @@ export const GET = route(async (req: Request) => {
     const rows = await all('SELECT first_name, last_name, email, state, status FROM contacts ORDER BY state, last_name, first_name')
     text = csv(['First Name', 'Last Name', 'Email', 'State', 'Status'], rows.map((r) => [r.first_name, r.last_name, r.email, r.state, r.status]))
     name = 'contacts.csv'
+  } else if (q.get('type') === 'replied') {
+    const rows = await all(`SELECT ct.first_name, ct.last_name, r.from_email, ct.state, ct.company, c.name campaign, r.received_at, r.body
+      FROM replies r LEFT JOIN contacts ct ON ct.id = r.contact_id LEFT JOIN campaigns c ON c.id = r.campaign_id
+      WHERE r.kind = 'reply' ORDER BY r.received_at DESC`)
+    text = csv(['First Name', 'Last Name', 'Email', 'State', 'Company', 'Campaign', 'Replied', 'Message'],
+      rows.map((r) => [r.first_name, r.last_name, r.from_email, r.state, r.company, r.campaign, iso(r.received_at), String(r.body || '').split(/\n\s*(?:On .+wrote:|>)/)[0].trim().slice(0, 1000)]))
+    name = 'replies-for-sales.csv'
   } else if (q.get('type') === 'campaign' && q.get('id')) {
     const id = Number(q.get('id'))
     const rows = await all(`SELECT ct.first_name, ct.last_name, s.email, ct.state, s.status, s.provider, s.sent_at, s.delivered_at, s.opened_at, s.replied_at, s.bounced_at, s.last_error

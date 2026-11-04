@@ -55,6 +55,8 @@ export async function ingest(parsed: ParsedMail, fallbackId: string): Promise<bo
 
   if (kind === 'reply' || kind === 'unsubscribe') await run('UPDATE sends SET replied_at = COALESCE(replied_at, ?) WHERE id = ?', [received, send.id])
   if (kind === 'unsubscribe') await run("UPDATE contacts SET status = 'unsubscribed' WHERE id = ?", [send.contact_id])
+  // someone who answered belongs to the sales team now, so no more campaign emails
+  if (kind === 'reply') await run("UPDATE contacts SET status = 'replied' WHERE id = ? AND status = 'active'", [send.contact_id])
   if (kind === 'bounce') {
     await batch([
       { sql: 'UPDATE sends SET bounced_at = COALESCE(bounced_at, ?) WHERE id = ?', args: [received, send.id] },

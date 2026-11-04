@@ -70,3 +70,7 @@ Campaigns page par state card dabayein, ya New campaign. 5 steps: State, Content
 Content mein PDF, Word (.docx) ya .txt upload ya drop karein (4 MB tak). Pehli line "Subject: ..." ho to subject wahan se aata hai, warna heading se. `{{first_name}}` aur `{{state_name}}` khud bharte hain. Logo, footer aur design wahi rehte hain.
 
 Batches poore domain ke hisaab se bante hain: warm-up 100, 200, 300 roz, phir poori limit. Doosri campaign queue mein ho to nayi campaign ki dates us ke baad aati hain. Launch par saare batches khud schedule ho jate hain.
+
+## Replies aur sales
+
+Jo reply kare us ka status "With sales" ho jata hai: follow-up aur aage ki har campaign band. Inbox ka Export for sales button un sab ki CSV deta hai. Contacts page par With sales filter se bhi dikhte hain.

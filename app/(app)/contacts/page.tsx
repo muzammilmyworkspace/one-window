@@ -34,9 +34,10 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
         <ImportButton />
       </PageHead>
 
-      <section aria-label="Totals" className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section aria-label="Totals" className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
         <Stat label="All contacts" value={total} />
         <Stat label="Active" value={n('active')} sub="Can be emailed" />
+        <Stat label="With sales" value={n('replied')} sub="Replied, no more campaign emails" />
         <Stat label="Unsubscribed" value={n('unsubscribed')} sub="Never emailed again" />
         <Stat label="Bounced" value={n('bounced')} sub="Never emailed again" />
       </section>
@@ -51,6 +52,7 @@ export default async function Contacts({ searchParams }: { searchParams: Promise
           <select name="status" defaultValue={status} aria-label="Status" className="field w-auto">
             <option value="">All statuses</option>
             <option value="active">Active</option>
+            <option value="replied">With sales (replied)</option>
             <option value="unsubscribed">Unsubscribed</option>
             <option value="bounced">Bounced</option>
           </select>

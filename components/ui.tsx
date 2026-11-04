@@ -57,6 +57,7 @@ const STATUS: Record<string, [Tone, string, string]> = {
   skipped: ['mute', 'x', 'Skipped'],
   active: ['good', 'check', 'Active'],
   unsubscribed: ['warn', 'x', 'Unsubscribed'],
+  replied: ['info', 'reply', 'With sales'],
   bounced: ['bad', 'alert', 'Bounced'],
   reply: ['good', 'reply', 'Reply'],
   auto: ['mute', 'clock', 'Auto-reply'],
