@@ -1,11 +1,13 @@
 import { all, batch, getKv, lease, one, release, run, setKv } from './db'
-import { deliver, noteError, noteOk, pickProvider } from './providers'
+import { dailyCapacity, deliver, noteError, noteOk, pickProvider } from './providers'
+import { allowedBy } from './plan'
 import { renderEmail } from './email'
 import { getSettings, isLive } from './settings'
 import { preflight } from './preflight'
 import { imapConfigured, syncInbox } from './inbox'
 
 const INBOX_EVERY = 2 * 60 * 1000
+const DAY = 24 * 3600 * 1000
 export const SAFETY = { bounce: 0.05, minBounce: 50, complaint: 0.003, minComplaint: 100, ackStep: 3 }
 
 function audience(c: { states?: unknown; follow_up_of?: unknown }) {
@@ -39,7 +41,7 @@ export async function startCampaign(id: number): Promise<number> {
   return r.changes
 }
 
-export interface TickResult { sent: number; running: boolean; waiting?: 'gap' | 'busy' | 'caps'; inbox?: number }
+export interface TickResult { sent: number; running: boolean; waiting?: 'gap' | 'busy' | 'caps' | 'batch'; inbox?: number }
 
 /** One step of the engine: send at most one email, and now and then read the inbox. */
 export async function tick(): Promise<TickResult> {
@@ -66,14 +68,16 @@ export async function tick(): Promise<TickResult> {
     await run("UPDATE sends SET status = 'queued' WHERE status = 'sending'")
 
     await safetyStop()
+    const held = await heldForBatch()
 
     const next = await one(`SELECT s.id, s.contact_id, s.attempts, ct.email, ct.first_name, ct.last_name, ct.state, ct.status contact_status,
         cp.subject, cp.html, cp.preheader
       FROM sends s JOIN campaigns cp ON cp.id = s.campaign_id JOIN contacts ct ON ct.id = s.contact_id
-      WHERE s.status = 'queued' AND cp.status = 'running' ORDER BY cp.started_at, s.id LIMIT 1`)
+      WHERE s.status = 'queued' AND cp.status = 'running'${held.length ? ` AND cp.id NOT IN (${held.join(',')})` : ''} ORDER BY cp.started_at, s.id LIMIT 1`)
     if (!next) {
       await run(`UPDATE campaigns SET status = 'completed', completed_at = ? WHERE status = 'running'
         AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.campaign_id = campaigns.id AND s.status = 'queued')`, [Date.now()])
+      if (held.length) { out.running = true; out.waiting = 'batch' }
       return out
     }
     out.running = true
@@ -113,6 +117,15 @@ export async function tick(): Promise<TickResult> {
   } finally {
     await release('send_lock')
   }
+}
+
+/** Warm-up campaigns that have finished today's batch and wait for the next one. */
+async function heldForBatch(): Promise<number[]> {
+  const rows = await all(`SELECT c.id, c.started_at, (SELECT COUNT(*) FROM sends s WHERE s.campaign_id = c.id AND s.sent_at IS NOT NULL) sent
+    FROM campaigns c WHERE c.status = 'running' AND c.warmup = 1`)
+  if (!rows.length) return []
+  const capacity = await dailyCapacity()
+  return rows.filter((r) => Number(r.sent) >= allowedBy(Math.floor((Date.now() - Number(r.started_at)) / DAY), capacity)).map((r) => Number(r.id))
 }
 
 /** A list going bad hurts the domain for good, so a running campaign stops itself in time. */
@@ -156,8 +169,8 @@ export async function retryFailed(id: number): Promise<number> {
 export async function duplicateCampaign(id: number): Promise<number> {
   const c = await one('SELECT * FROM campaigns WHERE id = ?', [id])
   if (!c) throw new Error('Campaign not found')
-  const r = await run('INSERT INTO campaigns (name, subject, preheader, html, states, follow_up_of, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [`${c.name} (copy)`, c.subject as string, c.preheader as string, c.html as string, c.states as string, (c.follow_up_of ?? null) as number | null, Date.now()])
+  const r = await run('INSERT INTO campaigns (name, subject, preheader, html, states, follow_up_of, warmup, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [`${c.name} (copy)`, c.subject as string, c.preheader as string, c.html as string, c.states as string, (c.follow_up_of ?? null) as number | null, Number(c.warmup), Date.now()])
   return r.id
 }
 

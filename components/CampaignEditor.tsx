@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { batches } from '@/lib/plan'
+import SendingPlan from './SendingPlan'
 import { Badge, Icon } from './ui'
 
-export interface Draft { id?: number; name: string; subject: string; preheader: string; html: string; states: string[]; follow_up_of: number | null }
+export interface Draft { id?: number; name: string; subject: string; preheader: string; html: string; states: string[]; follow_up_of: number | null; warmup: boolean }
 interface Template { key: string; label: string; name: string; subject: string; preheader: string; html: string }
 interface Option { id: number; name: string; sent: number }
 interface Check { label: string; ok: boolean; blocking: boolean; help: string }
@@ -116,7 +118,8 @@ export default function CampaignEditor(props: {
 
   const toggleState = (s: string) => set({ states: d.states.includes(s) ? d.states.filter((x) => x !== s) : [...d.states, s] })
   const audienceSum = d.states.length ? props.stateCounts.filter((s) => d.states.includes(s.state)).reduce((a, s) => a + s.n, 0) : props.stateCounts.reduce((a, s) => a + s.n, 0)
-  const days = confirm && props.capacity ? Math.ceil(confirm / props.capacity) : 0
+  const previewPlan = batches(audienceSum, 0, props.capacity, d.warmup, Date.now())
+  const confirmPlan = batches(confirm || 0, 0, props.capacity, d.warmup, Date.now())
 
   const tool = 'rounded-md px-2.5 py-1.5 text-sm font-semibold hover:bg-page'
   return (
@@ -211,6 +214,16 @@ export default function CampaignEditor(props: {
         </section>
 
         <section className="card p-5">
+          <h2 className="text-base">Sending plan</h2>
+          <p className="mb-3 mt-0.5 text-[13px] text-ink-3">Not everyone at once. Each batch goes out through the day.</p>
+          <label className="mb-3 flex items-start gap-2.5 rounded-lg bg-page p-3">
+            <input type="checkbox" checked={d.warmup} onChange={(e) => set({ warmup: e.target.checked })} className="mt-0.5 h-4 w-4 accent-[#2b4deb]" />
+            <span className="text-[13px] leading-snug"><b>Warm up the domain</b><br /><span className="text-ink-2">Start with 100, 200, 300 a day. Recommended for a new domain.</span></span>
+          </label>
+          {d.follow_up_of ? <p className="text-[13px] text-ink-2">Shown when you press Review and start.</p> : <SendingPlan batches={previewPlan} />}
+        </section>
+
+        <section className="card p-5">
           <h2 className="text-base">Send yourself a test</h2>
           <div className="mt-3 space-y-2">
             <input aria-label="Your email" type="email" className="field" placeholder="you@gmail.com" value={testTo} onChange={(e) => setTestTo(e.target.value)} />
@@ -237,7 +250,7 @@ export default function CampaignEditor(props: {
             {confirm > 0 && (
               <ul className="mt-3 space-y-1.5 text-sm text-ink-2">
                 <li><b className="text-ink">Subject:</b> {preview.subject}</li>
-                {days > 0 && <li><b className="text-ink">Takes:</b> about {days} {days === 1 ? 'day' : 'days'} at {props.capacity} a day</li>}
+                {confirmPlan.length > 0 && <li><b className="text-ink">First batch:</b> {confirmPlan[0].size.toLocaleString()} emails today, then the rest in {confirmPlan.length - 1} more {confirmPlan.length === 2 ? 'batch' : 'batches'}</li>}
                 <li><b className="text-ink">Replies go to:</b> your info@ inbox and the Inbox page here</li>
                 <li className={props.live ? 'font-bold text-bad' : 'font-bold text-sun-ink'}>{props.live ? 'These are real emails. This cannot be undone, only paused.' : 'Practice mode: nothing will really be sent.'}</li>
               </ul>

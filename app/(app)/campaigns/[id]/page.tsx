@@ -7,7 +7,9 @@ import { all, one } from '@/lib/db'
 import { renderEmail } from '@/lib/email'
 import { editorData } from '@/lib/editorData'
 import { campaignStats } from '@/lib/engine'
-import { PROVIDER_LABEL, type ProviderName } from '@/lib/providers'
+import { batches } from '@/lib/plan'
+import { dailyCapacity, PROVIDER_LABEL, type ProviderName } from '@/lib/providers'
+import SendingPlan from '@/components/SendingPlan'
 import { TEMPLATES } from '@/lib/seed'
 import { getSettings } from '@/lib/settings'
 
@@ -30,7 +32,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <PageHead title={String(c.name)} sub={<Link href="/campaigns" className="hover:underline">Back to campaigns</Link>} />
         <CampaignEditor {...await editorData()} templates={TEMPLATES} initial={{
           id, name: String(c.name), subject: String(c.subject), preheader: String(c.preheader), html: String(c.html),
-          states: String(c.states).split(',').filter(Boolean), follow_up_of: c.follow_up_of ? Number(c.follow_up_of) : null,
+          states: String(c.states).split(',').filter(Boolean), follow_up_of: c.follow_up_of ? Number(c.follow_up_of) : null, warmup: !!c.warmup,
         }} />
       </>
     )
@@ -46,6 +48,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
     renderEmail({ subject: String(c.subject), html: String(c.html), preheader: String(c.preheader) }, { email: 'sarah@example.com', first_name: 'Sarah', last_name: 'Johnson', state: 'TX' }, await getSettings()),
   ])
   const pages = Math.max(1, Math.ceil(Number(count?.n || 0) / PAGE))
+  const plan = batches(stats.total, stats.sent, await dailyCapacity(), !!c.warmup, Number(c.started_at))
   const link = (nf: string, p = 1) => `/campaigns/${id}?f=${nf}&p=${p}`
 
   return (
@@ -102,13 +105,19 @@ export default async function CampaignPage({ params, searchParams }: { params: P
             </div>
           )}
         </section>
-        <section className="card self-start overflow-hidden">
+        <div className="space-y-5 self-start">
+        <section className="card p-4">
+          <h2 className="mb-3 text-base">Sending plan</h2>
+          <SendingPlan batches={plan} started />
+        </section>
+        <section className="card overflow-hidden">
           <div className="border-b border-line p-4">
             <h2 className="flex items-center gap-2 text-base"><Icon name="send" size={16} /> The email</h2>
             <p className="mt-1 text-sm text-ink-2">{mail.subject}</p>
           </div>
           <iframe title="Email sent in this campaign" sandbox="" srcDoc={mail.html} className="h-[560px] w-full" />
         </section>
+        </div>
       </div>
     </>
   )

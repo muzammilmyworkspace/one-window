@@ -45,6 +45,11 @@ export async function pickProvider(): Promise<{ name: ProviderName; left: number
   return best
 }
 
+/** Emails a day across every sender that can be used right now. */
+export async function dailyCapacity(): Promise<number> {
+  return (await providers()).filter((p) => p.enabled && (!isLive() || !missingCreds(p.name).length)).reduce((a, p) => a + Number(p.daily_cap), 0)
+}
+
 export interface Outgoing {
   from: string; to: string; replyTo: string; subject: string; html: string; text: string
   messageId: string; headers?: Record<string, string>

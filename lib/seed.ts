@@ -1,8 +1,22 @@
-// The two starting emails. Footer and layout are added when the email is built.
+// The two starting emails. Header, footer and layout are added when the email is built.
+const G = '#0E9F6E', INK = '#17302A', SOFT = '#E9F7F1'
+
 const p = (t: string) => `<p style="margin:0 0 16px;">${t}</p>`
+const h1 = (t: string) => `<h1 style="margin:0 0 16px;font-size:25px;line-height:1.25;font-weight:bold;color:${INK};">${t}</h1>`
+const box = (label: string, value: string) =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 22px;"><tr><td style="background:${SOFT};border-left:4px solid ${G};border-radius:6px;padding:14px 18px;">
+<p style="margin:0;font-size:13px;color:#46665C;">${label}</p>
+<p style="margin:2px 0 0;font-size:18px;font-weight:bold;color:${INK};">${value}</p>
+</td></tr></table>`
 const btn = (label: string, utm: string) =>
-  `<p style="margin:0 0 20px;"><a href="https://www.thesupportlife.com/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=${utm}" style="display:inline-block;padding:14px 26px;background:#0E9F6E;border-radius:8px;color:#ffffff;text-decoration:none;font-weight:bold;">${label}</a></p>`
-const phone = '<a href="tel:+18722171852" style="color:#0E9F6E;">(872) 217-1852</a>'
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 20px;"><tr><td align="center" style="background:${G};border-radius:10px;">
+<a href="https://www.thesupportlife.com/?utm_source=email&amp;utm_medium=email&amp;utm_campaign=${utm}" style="display:block;padding:16px 24px;color:#ffffff;text-decoration:none;font-size:17px;font-weight:bold;">${label}</a>
+</td></tr></table>`
+const phone = `<a href="tel:+18722171852" style="color:${G};font-weight:bold;text-decoration:none;">(872) 217-1852</a>`
+const row = (mark: string, title: string, text: string) =>
+  `<tr><td width="42" valign="top" style="padding:0 0 16px;"><div style="width:30px;height:30px;line-height:30px;text-align:center;background:${G};border-radius:15px;color:#ffffff;font-size:14px;font-weight:bold;">${mark}</div></td>
+<td valign="top" style="padding:0 0 16px;"><strong style="color:${INK};">${title}</strong><br>${text}</td></tr>`
+const rows = (inner: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 8px;">${inner}</table>`
 
 export const TEMPLATES = [
   {
@@ -12,18 +26,20 @@ export const TEMPLATES = [
     subject: '{{first_name}}, your 2027 health plan may cost more. Check before it renews',
     preheader: "Open Enrollment runs until January 15. Here's what changed for 2027.",
     html: [
+      h1('Your 2027 health plan may cost more'),
       p('Hi {{first_name}},'),
-      p('Open Enrollment for 2027 health coverage is open now and runs until <strong>January 15, 2027</strong>. If you do nothing, your plan may simply renew, and this is a year where that could cost you.'),
-      '<p style="margin:0 0 8px;"><strong>Three things that changed:</strong></p>',
-      `<ul style="margin:0 0 16px;padding-left:20px;">
-<li style="margin-bottom:8px;"><strong>Premiums are going up.</strong> KFF's review of 276 insurers found a median proposed increase of about 15% for 2027.</li>
-<li style="margin-bottom:8px;"><strong>The extra tax credits ended.</strong> If your household income is above 400% of the poverty level, you may no longer qualify for help, so a small raise can cost you thousands a year.</li>
-<li style="margin-bottom:8px;"><strong>A $0 premium isn't free care.</strong> Deductibles, copays and which doctors are covered matter as much as the monthly price.</li>
-</ul>`,
+      p('Open Enrollment for 2027 health coverage is open now. If you do nothing, your plan may simply renew, and this is a year where that could cost you.'),
+      box('Open Enrollment ends', 'January 15, 2027'),
+      `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">Three things that changed</p>`,
+      rows([
+        row('1', 'Premiums are going up.', "KFF's review of 276 insurers found a median proposed increase of about 15% for 2027."),
+        row('2', 'The extra tax credits ended.', 'If your household income is above 400% of the poverty level, you may no longer qualify for help, so a small raise can cost you thousands a year.'),
+        row('3', "A $0 premium isn't free care.", 'Deductibles, copays and which doctors are covered matter as much as the monthly price.'),
+      ].join('\n')),
       p("We can connect you with a licensed agent who will compare your 2027 options with you. It's free, and there's no obligation to enroll."),
       btn('Check my 2027 options', 'oe2027_email1'),
-      p(`Prefer to talk? Call ${phone} or just reply to this email.`),
-      p('Thanks,<br>The Support Life team'),
+      `<p style="margin:0 0 20px;text-align:center;">Prefer to talk? Call ${phone} or just reply to this email.</p>`,
+      p('Thanks,<br><strong>The Support Life team</strong>'),
     ].join('\n'),
   },
   {
@@ -33,19 +49,22 @@ export const TEMPLATES = [
     subject: '{{first_name}}, want coverage from January 1? Enroll by December 15',
     preheader: 'A 15-minute call with a licensed agent. Free, no obligation.',
     html: [
+      h1('Want coverage from January 1?'),
       p('Hi {{first_name}},'),
-      p('A quick follow-up on my last note. If you want new coverage to start on <strong>January 1</strong>, the Marketplace deadline is <strong>December 15</strong>. Open Enrollment closes completely on January 15.'),
-      '<p style="margin:0 0 8px;">Before you renew, it\'s worth checking:</p>',
-      `<ul style="margin:0 0 16px;padding-left:20px;">
-<li style="margin-bottom:6px;">What your plan will cost each month in 2027</li>
-<li style="margin-bottom:6px;">Your deductible and out-of-pocket maximum</li>
-<li style="margin-bottom:6px;">Whether your doctors and prescriptions are still covered</li>
-<li style="margin-bottom:6px;">Whether your income still qualifies you for savings</li>
-</ul>`,
+      p('A quick follow-up on my last note. If you want new coverage to start on January 1, there is one date to remember.'),
+      box('Marketplace deadline for January 1 coverage', 'December 15'),
+      p('Open Enrollment closes completely on January 15.'),
+      `<p style="margin:0 0 14px;font-size:17px;font-weight:bold;color:${INK};">Before you renew, it's worth checking</p>`,
+      rows([
+        row('&#10003;', 'Monthly cost', 'What your plan will cost each month in 2027.'),
+        row('&#10003;', 'Out-of-pocket costs', 'Your deductible and out-of-pocket maximum.'),
+        row('&#10003;', 'Doctors and prescriptions', 'Whether they are still covered.'),
+        row('&#10003;', 'Savings', 'Whether your income still qualifies you.'),
+      ].join('\n')),
       p('A licensed agent can go through all of this with you in about 15 minutes. Free, and no obligation to enroll.'),
       btn('Get my free plan review', 'oe2027_email2'),
-      p(`Or call ${phone}.`),
-      p('Thanks,<br>The Support Life team'),
+      `<p style="margin:0 0 20px;text-align:center;">Or call ${phone}.</p>`,
+      p('Thanks,<br><strong>The Support Life team</strong>'),
     ].join('\n'),
   },
 ]

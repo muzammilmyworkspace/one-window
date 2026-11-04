@@ -9,7 +9,7 @@ export default async function NewCampaign() {
     <>
       <PageHead title="New campaign" />
       <CampaignEditor {...await editorData()} templates={TEMPLATES}
-        initial={{ name: t.name, subject: t.subject, preheader: t.preheader, html: t.html, states: [], follow_up_of: null }} />
+        initial={{ name: t.name, subject: t.subject, preheader: t.preheader, html: t.html, states: [], follow_up_of: null, warmup: true }} />
     </>
   )
 }

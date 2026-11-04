@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { all, getKv, one } from '@/lib/db'
 import { campaignStats, dailySends } from '@/lib/engine'
+import { batches } from '@/lib/plan'
 import { missingCreds, PROVIDER_LABEL, providers, usedToday } from '@/lib/providers'
 import { Empty, Icon, Meter, Notice, PageHead, pct, Stat, StatusBadge, when } from '@/components/ui'
 import SendsChart from '@/components/SendsChart'
@@ -19,7 +20,8 @@ export default async function Dashboard() {
   const usage = await Promise.all(provs.map(async (p) => ({ ...p, used: await usedToday(p.name), missing: missingCreds(p.name) })))
   const capacity = usage.filter((p) => p.enabled && !p.missing.length).reduce((a, p) => a + Number(p.daily_cap), 0)
   const rs = running ? await campaignStats(Number(running.id)) : null
-  const daysLeft = rs && capacity ? Math.ceil(rs.queued / capacity) : null
+  const plan = rs && running ? batches(rs.total, rs.sent, capacity, !!running.warmup, Number(running.started_at)) : []
+  const current = plan.find((b) => b.state !== 'done')
   const none = seen ? null : 'Shows once the tool is live'
 
   return (
@@ -39,7 +41,7 @@ export default async function Dashboard() {
               </div>
               <p className="mt-1 text-sm text-ink-2">
                 {rs.sent.toLocaleString()} of {rs.total.toLocaleString()} sent
-                {daysLeft ? ` · about ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left at ${capacity} a day` : ''}
+                {current ? ` · Batch ${current.index + 1} of ${plan.length}: ${current.done} of ${current.size} sent` : ''}
               </p>
             </div>
             <CampaignButtons id={Number(running.id)} status={String(running.status)} />

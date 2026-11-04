@@ -15,8 +15,8 @@ export const PUT = route(async (req: Request, ctx: Ctx) => {
   const id = Number((await ctx.params).id)
   const b = await req.json()
   if (!String(b.name || '').trim() || !String(b.subject || '').trim() || !String(b.html || '').trim()) return fail('Name, subject and body are required')
-  const r = await run("UPDATE campaigns SET name = ?, subject = ?, preheader = ?, html = ?, states = ?, follow_up_of = ? WHERE id = ? AND status = 'draft'",
-    [b.name.trim(), b.subject.trim(), String(b.preheader || '').trim(), b.html, (b.states || []).join(','), b.follow_up_of ? Number(b.follow_up_of) : null, id])
+  const r = await run("UPDATE campaigns SET name = ?, subject = ?, preheader = ?, html = ?, states = ?, follow_up_of = ?, warmup = ? WHERE id = ? AND status = 'draft'",
+    [b.name.trim(), b.subject.trim(), String(b.preheader || '').trim(), b.html, (b.states || []).join(','), b.follow_up_of ? Number(b.follow_up_of) : null, b.warmup ? 1 : 0, id])
   if (!r.changes) return fail('Only a draft can be edited')
   return json({ ok: true })
 })

@@ -13,7 +13,7 @@ const NAV = [
   { href: '/settings', label: 'Settings', icon: 'gear' },
 ]
 
-const WAITING: Record<string, string> = { caps: 'Daily limits reached, continues automatically' }
+const WAITING: Record<string, string> = { caps: 'Daily limits reached, continues automatically', batch: 'Batch finished, the next one starts automatically' }
 
 /** Keeps the queue moving while the tool is open. Once live, a cron job does the same with it closed. */
 function useEngine(setStatus: (s: string) => void) {

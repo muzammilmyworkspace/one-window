@@ -10,6 +10,12 @@ export const SETTING_DEFAULTS = {
   reason: "You're receiving this because you previously asked about health coverage.",
   gap_seconds: '30',
   webmail_url: 'https://mail.hostinger.com',
+  assets_url: 'https://www.thesupportlife.com/email',
+  website_url: 'https://www.thesupportlife.com',
+  phone: '(872) 217-1852',
+  facebook_url: 'https://www.facebook.com/thesupportlife',
+  instagram_url: 'https://www.instagram.com/thesupportlife.us/',
+  reddit_url: 'https://www.reddit.com/user/thesupportlife/',
 }
 export type Settings = typeof SETTING_DEFAULTS
 export type SettingKey = keyof Settings

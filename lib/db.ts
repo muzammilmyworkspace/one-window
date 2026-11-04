@@ -95,6 +95,7 @@ const COLUMNS = [
   'ALTER TABLE campaigns ADD COLUMN pause_reason TEXT',
   'ALTER TABLE campaigns ADD COLUMN safety_ack INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE sends ADD COLUMN complained_at INTEGER',
+  'ALTER TABLE campaigns ADD COLUMN warmup INTEGER NOT NULL DEFAULT 0',
 ]
 
 function client(): Client {
