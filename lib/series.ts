@@ -25,7 +25,7 @@ function build(subject: string, body: Block[], sign: string, source: string, fir
       i--
       parts.push(e.checks(run))
     } else if (/reply to this email/i.test(b.text)) {
-      const word = (b.text.match(/just send ([A-Z0-9 ]+)\./) || [])[1] || ''
+      const word = (b.text.match(/[Jj]ust send ([A-Z0-9 ]+)\./) || [])[1] || ''
       parts.push(e.reply(esc(b.text), word.trim()))
     } else if (b.text.endsWith(':')) parts.push(e.p(`<strong>${esc(b.text)}</strong>`))
     else parts.push(e.p(esc(b.text)))
