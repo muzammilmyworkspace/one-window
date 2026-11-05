@@ -17,6 +17,16 @@ export async function ensureDrafts() {
       if (seq.length === 5) await run("UPDATE campaigns SET name = 'Illinois, 3-email series', sequence = ? WHERE id = ?", [JSON.stringify([seq[0], { ...seq[4], day: 6 }]), Number(c.id)])
     }
   }
+  // Everything moved to the light, personal format: drafts take the new text and Donny becomes the sender.
+  if (!(await getKv('draft:plain-1'))) {
+    await setKv('draft:plain-1', '1')
+    await setKv('set:from_name', 'Donny Wilson')
+    for (const d of data as { name: string; emails: { subject: string; preheader: string; html: string }[] }[]) {
+      const [first, ...rest] = d.emails
+      await run("UPDATE campaigns SET subject = ?, preheader = ?, html = ?, sequence = ? WHERE name = ? AND status = 'draft'",
+        [first.subject, first.preheader, first.html, JSON.stringify(rest), d.name])
+    }
+  }
   for (const d of data as { key: string; name: string; state: string; emails: { subject: string; preheader: string; html: string; day: number }[] }[]) {
     if (await getKv(`draft:${d.key}`)) continue
     if (started && d.key === 'other-series-1') continue   // those states are already being emailed

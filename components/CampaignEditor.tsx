@@ -127,13 +127,6 @@ export default function CampaignEditor(props: {
     }
   }
 
-  function usePrepared() {
-    const t = props.templates.find((x) => x.list === 'clients')
-    if (!t) return
-    patchCur({ subject: t.subject, preheader: t.preheader, html: t.html })
-    setEditing(false)
-  }
-
   function addLink() {
     const url = prompt('Link address (https://…)')
     if (url) cmd('createLink', url)
@@ -271,7 +264,6 @@ export default function CampaignEditor(props: {
                 <span className="mt-2 font-semibold">{reading ? 'Reading the file…' : 'Upload PDF or Word'}</span>
                 <span className="text-[13px] text-ink-2">Click, or drop the file here</span>
               </button>
-              <button type="button" onClick={usePrepared} className="mt-2 text-sm font-semibold text-brand-dark hover:underline">Or use our ready email</button>
 
               <label htmlFor="c-subject" className="label mt-5">Subject line</label>
               <input id="c-subject" className="field" value={cur.subject} onChange={(e) => patchCur({ subject: e.target.value })} />

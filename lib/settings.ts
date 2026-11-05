@@ -1,7 +1,8 @@
 import { all, setKv } from './db'
 
 export const SETTING_DEFAULTS = {
-  from_name: 'The Support Life',
+  from_name: 'Donny Wilson',
+  brand_name: 'The Support Life',
   from_email: 'info@thesupportlife.com',
   reply_to: 'info@thesupportlife.com',
   address: 'The Support Life · 10685-B Hazelhurst Dr Ste 42901, Houston, TX 77043, USA',
