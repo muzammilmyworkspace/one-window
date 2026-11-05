@@ -7,12 +7,13 @@ export const SERIES_DAYS = [1, 3, 6, 9, 12, 16]
 // Plain on purpose: a personal looking email has a better chance of reaching the main inbox.
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 const p = (t: string) => `<p style="margin:0 0 14px;">${t}</p>`
-const list = (items: string[]) => `<ul style="margin:0 0 14px;padding-left:22px;">${items.map((t) => `<li style="margin-bottom:5px;">${t}</li>`).join('')}</ul>`
+const list = (items: string[]) => `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 14px;">${items.map((t) => `<tr><td width="24" valign="top" style="padding:2px 0;color:#0E9F6E;font-weight:bold;">&#10003;</td><td style="padding:2px 0;">${t}</td></tr>`).join('')}</table>`
+const replyBox = (t: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:4px 0 18px;"><tr><td bgcolor="#EEF8F3" style="background:#EEF8F3;border-left:4px solid #0E9F6E;border-radius:6px;padding:13px 15px;font-weight:bold;color:#0C3A2C;">${t}</td></tr></table>`
 const isGreeting = (t: string) => /^(hi|hello|dear)\b[^.!?]{0,30},?$/i.test(t)
 const isSignature = (t: string) => /support life/i.test(t) && /\d{3}[-\s]\d{4}/.test(t)
 const clean = (t: string) => t.replace(/^subject(\s*line)?\s*[:\-–]\s*/i, '').trim()
 const greeting = (t: string) => (/^hi,?$/i.test(t) ? 'Hi {{first_name}},' : esc(t))
-const signature = (t: string) => t.replace(/\s*The Support Life\s*/, '<br>The Support Life<br>').replace(/<br>\s*$/, '')
+const signature = (t: string) => `<strong style="color:#0C3A2C;">${t.replace(/\s*The Support Life\s*/, '</strong><br><span style="color:#0E9F6E;font-weight:bold;">The Support Life</span><br>').replace(/<br>\s*$/, '')}`
 
 function build(subject: string, body: Block[], sign: string, source: string, day: number): SeriesEmail {
   const parts = [p(greeting(body[0].text))]
@@ -25,7 +26,7 @@ function build(subject: string, body: Block[], sign: string, source: string, day
       while (i < rest.length && rest[i].kind === b.kind) run.push(esc(rest[i++].text))
       i--
       parts.push(list(run))
-    } else if (/reply to this email/i.test(b.text)) parts.push(p(`<strong>${esc(b.text)}</strong>`))
+    } else if (/reply to this email/i.test(b.text)) parts.push(replyBox(esc(b.text)))
     else parts.push(p(esc(b.text)))
   }
   parts.push(p(signature(sign)))
