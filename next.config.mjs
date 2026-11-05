@@ -2,6 +2,7 @@
 export default {
   poweredByHeader: false,
   devIndicators: false,
+  experimental: { staleTimes: { dynamic: 0, static: 0 } },
   serverExternalPackages: ['@libsql/client', 'libsql', 'nodemailer', 'imapflow', 'mailparser', 'exceljs', 'mammoth', 'unpdf'],
   async headers() {
     return [{ source: '/:path*', headers: [

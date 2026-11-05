@@ -2,7 +2,9 @@ import Link from 'next/link'
 import { all } from '@/lib/db'
 import StateCards from '@/components/StateCards'
 import { Empty, Icon, Meter, PageHead, pct, StatusBadge, when } from '@/components/ui'
+import LaunchAll from '@/components/LaunchAll'
 import { ensureDrafts } from '@/lib/drafts'
+import { isLive } from '@/lib/settings'
 import { stateOverview } from '@/lib/editorData'
 import { stateName } from '@/lib/lists'
 
@@ -15,10 +17,13 @@ export default async function Campaigns() {
     (SELECT COUNT(*) FROM sends s WHERE s.campaign_id = c.id AND s.bounced_at IS NOT NULL) bounced
     FROM campaigns c WHERE c.auto_child = 0 ORDER BY c.created_at DESC`)
   const states = await stateOverview()
+  const series = rows.filter((c) => c.status === 'draft' && c.sequence)
+  const everyone = series.reduce((a, c) => a + (states.find((s) => s.code === c.states)?.total || 0), 0)
   return (
     <>
       <PageHead title="Campaigns" sub="Pick a state to write its email.">
-        <Link href="/campaigns/new" className="btn btn-primary"><Icon name="plus" size={16} /> New campaign</Link>
+        {series.length > 1 && <LaunchAll drafts={series.length} people={everyone} live={isLive()} />}
+        <Link href="/campaigns/new" className="btn btn-ghost"><Icon name="plus" size={16} /> New campaign</Link>
       </PageHead>
       <section aria-label="States" className="mb-7"><StateCards states={states} /></section>
 

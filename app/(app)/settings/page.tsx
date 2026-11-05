@@ -1,6 +1,6 @@
 import { CopyField, ProviderCard, ResetPractice, SettingsForm } from '@/components/SettingsParts'
 import { Badge, Icon, PageHead, when } from '@/components/ui'
-import { getKv } from '@/lib/db'
+import { getKv, one } from '@/lib/db'
 import { imapConfigured } from '@/lib/inbox'
 import { domainChecks, missingCreds, PROVIDER_LABEL, providers, usedToday } from '@/lib/providers'
 import { getSettings, isLive } from '@/lib/settings'
@@ -24,6 +24,7 @@ export default async function SettingsPage() {
   const secret = process.env.CRON_SECRET || ''
   const isPublic = app.startsWith('https')
   const info = deploymentInfo()
+  const stored = await one<{ n: number }>('SELECT COUNT(*) n FROM contacts')
 
   return (
     <>
@@ -32,7 +33,7 @@ export default async function SettingsPage() {
       </PageHead>
 
       <p className="mb-5 rounded-lg border border-line bg-white px-4 py-2.5 font-mono text-[12.5px] text-ink-2">
-        environment: {info.environment} · SEND_MODE: {info.mode} · database: {info.database}{info.commit ? ` · build: ${info.commit}` : ''}
+        environment: {info.environment} · SEND_MODE: {info.mode} · database: {info.database} · contacts: {Number(stored?.n || 0).toLocaleString()}{info.commit ? ` · build: ${info.commit}` : ''}
       </p>
 
       <h2 className="mb-3 text-lg">Connections</h2>

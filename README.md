@@ -78,3 +78,7 @@ Jo reply kare us ka status "With sales" ho jata hai: follow-up aur aage ki har c
 ## Email series
 
 Word file mein kai emails hon (har ek "Hi," se shuru aur signature par khatam) to tool unhein khud alag kar deta hai: tabs mein Email 1, 2, 3... aur din 1, 3, 6, 9, 12, 16. Launch ke baad har email pichli email ke din ginti se khud jati hai, aur reply, bounce ya unsubscribe par ruk jati hai. Sab kuch type karte hi save hota hai.
+
+## Saari states ek saath
+
+Campaigns page par Launch all har state ki series ek saath schedule karta hai: Georgia pehle, Illinois aakhir mein. Settings ki upar wali line mein database aur contacts ki ginti dikhti hai.

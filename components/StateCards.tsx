@@ -32,7 +32,7 @@ export default function StateCards({ states, selected, onPick }: { states: State
         <button key={s.code} type="button" aria-pressed={selected === s.code} onClick={() => onPick(s.code)}
           className={`${CARD} ${selected === s.code ? 'border-brand ring-2 ring-brand/25' : 'border-line hover:border-[#bfc1b8]'}`}><Body s={s} /></button>
       ) : (
-        <Link key={s.code} href={`/campaigns/new?state=${s.code}`} className={`${CARD} border-line hover:border-brand`}><Body s={s} /></Link>
+        <Link key={s.code} href={`/campaigns/new?state=${s.code}`} prefetch={false} className={`${CARD} border-line hover:border-brand`}><Body s={s} /></Link>
       ))}
     </div>
   )

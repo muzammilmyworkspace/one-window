@@ -61,7 +61,7 @@ export default function Shell({ unread, live, open, workspace, children }: { unr
           {NAV.map((n) => {
             const on = n.href === '/' ? path === '/' : path.startsWith(n.href)
             return (
-              <Link key={n.href} href={n.href} aria-current={on ? 'page' : undefined}
+              <Link key={n.href} href={n.href} prefetch={false} aria-current={on ? 'page' : undefined}
                 className={`flex flex-none items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm font-semibold transition-colors ${on ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}>
                 <Icon name={n.icon} />
                 {n.label}
