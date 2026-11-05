@@ -9,6 +9,8 @@ export const SETTING_DEFAULTS = {
     'The Support Life is a third-party marketing company that connects consumers with licensed insurance agents. We are not an insurance agency or carrier and are not affiliated with HealthCare.gov or any government agency.',
   reason: "You're receiving this because you previously asked about health coverage.",
   gap_seconds: '30',
+  send_from: '10',
+  send_to: '20',
   webmail_url: 'https://mail.hostinger.com',
   top_note: 'Open now · Ends Jan 15',
   assets_url: 'https://www.thesupportlife.com/email',

@@ -3,6 +3,7 @@ import { dailyCapacity, deliver, noteError, noteOk, pickProvider } from './provi
 import { dayLimit, type PlanContext } from './plan'
 import { TEMPLATES } from './seed'
 import { reasonFor } from './lists'
+import { openHours } from './hours'
 import { renderEmail } from './email'
 import { getSettings, isLive } from './settings'
 import { preflight } from './preflight'
@@ -83,7 +84,7 @@ async function enqueueFollowups() {
   }
 }
 
-export interface TickResult { sent: number; running: boolean; waiting?: 'gap' | 'busy' | 'caps' | 'batch'; inbox?: number }
+export interface TickResult { sent: number; running: boolean; waiting?: 'gap' | 'busy' | 'caps' | 'batch' | 'hours'; inbox?: number }
 
 /** One step of the engine: send at most one email, and now and then read the inbox. */
 export async function tick(): Promise<TickResult> {
@@ -112,11 +113,18 @@ export async function tick(): Promise<TickResult> {
     await safetyStop()
     await enqueueFollowups()
     const held = await heldForBatch()
+    // practice mode ignores the clock, real emails only go out during the day
+    const hours = isLive() ? openHours(Number(settings.send_from), Number(settings.send_to)) : ''
+    if (hours === null) {
+      out.running = !!(await one("SELECT 1 x FROM campaigns WHERE status = 'running' LIMIT 1"))
+      out.waiting = 'hours'
+      return out
+    }
 
     const next = await one(`SELECT s.id, s.contact_id, s.attempts, ct.email, ct.first_name, ct.last_name, ct.state, ct.status contact_status,
         ct.company, ct.list_name contact_list, cp.subject, cp.html, cp.preheader, cp.reason
       FROM sends s JOIN campaigns cp ON cp.id = s.campaign_id JOIN contacts ct ON ct.id = s.contact_id
-      WHERE s.status = 'queued' AND cp.status = 'running'${held.length ? ` AND cp.id NOT IN (${held.join(',')})` : ''} ORDER BY cp.auto_child DESC, cp.started_at, s.id LIMIT 1`)
+      WHERE s.status = 'queued' AND cp.status = 'running'${hours}${held.length ? ` AND cp.id NOT IN (${held.join(',')})` : ''} ORDER BY cp.auto_child DESC, cp.started_at, s.id LIMIT 1`)
     if (!next) {
       await run(`UPDATE campaigns SET status = 'completed', completed_at = ? WHERE status = 'running'
         AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.campaign_id = campaigns.id AND s.status = 'queued')

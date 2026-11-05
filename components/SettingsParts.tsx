@@ -58,6 +58,8 @@ const FIELDS: { key: keyof Settings; label: string; hint?: string; long?: boolea
   { key: 'from_email', label: 'From address', hint: 'Must be on the domain connected in Brevo and Resend.' },
   { key: 'reply_to', label: 'Replies go to', hint: 'Your Hostinger mailbox.' },
   { key: 'gap_seconds', label: 'Seconds between emails', hint: 'Spacing them out helps keep mail out of spam.' },
+  { key: 'send_from', label: 'Send from (hour, 0-23)', hint: 'In each person\'s own time. 10 means 10 AM.' },
+  { key: 'send_to', label: 'Stop at (hour, 0-23)', hint: '20 means 8 PM.' },
   { key: 'webmail_url', label: 'Webmail link' },
   { key: 'top_note', label: 'Badge at the top of the email', hint: 'Update it after the deadline. Leave empty to hide it.' },
   { key: 'website_url', label: 'Website' },
