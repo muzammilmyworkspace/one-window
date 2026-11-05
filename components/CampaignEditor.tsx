@@ -84,16 +84,17 @@ export default function CampaignEditor(props: {
   const sync = () => { if (editor.current) patchCur({ html: editor.current.innerHTML }) }
   const cmd = (name: string, value?: string) => { editor.current?.focus(); document.execCommand(name, false, value); sync() }
 
-  const picked = props.states.find((s) => s.code === code)
+  const picked = props.states.filter((s) => d.states.includes(s.code))
   const everyone = props.states.reduce((a, s) => a + s.total, 0)
-  const total = picked ? picked.total : everyone
-  const place = picked ? picked.name : 'All states'
+  const total = picked.length ? picked.reduce((a, s) => a + s.total, 0) : everyone
+  const place = picked.length === 1 ? picked[0].name : picked.length ? `${picked.length} states` : 'All states'
   const slots = schedule(total, d.warmup, props.context)
   const finish = slots.length ? slots[slots.length - 1].offset : 0
 
   function pick(c: string) {
-    const name = c ? stateName(c) : 'All states'
-    set({ states: c ? [c] : [], name: !d.name || /, [A-Z][a-z]{2} \d{4}$/.test(d.name) ? `${name}, ${month()}` : d.name })
+    const states = !c ? [] : d.states.includes(c) ? d.states.filter((x) => x !== c) : [...d.states, c]
+    const name = states.length === 1 ? stateName(states[0]) : states.length ? `${states.length} states` : 'All states'
+    set({ states, name: !d.name || /, [A-Z][a-z]{2} \d{4}$/.test(d.name) ? `${name}, ${month()}` : d.name })
   }
 
   async function upload(f: File) {
@@ -237,11 +238,11 @@ export default function CampaignEditor(props: {
 
       {step === 0 && (
         <section className="mx-auto max-w-5xl">
-          <h2 className="text-2xl">Which state is this email for?</h2>
-          <p className="mt-1 text-sm text-ink-2">Each state gets its own email and its own batches.</p>
-          <div className="mt-5"><StateCards states={props.states} selected={code || undefined} onPick={pick} /></div>
-          <button type="button" aria-pressed={!code} onClick={() => pick('')}
-            className={`mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left ${!code ? 'border-brand bg-brand-soft' : 'border-line bg-white hover:border-[#bfc1b8]'}`}>
+          <h2 className="text-2xl">Which states is this email for?</h2>
+          <p className="mt-1 text-sm text-ink-2">Pick one state or several.</p>
+          <div className="mt-5"><StateCards states={props.states} selected={d.states} onPick={pick} /></div>
+          <button type="button" aria-pressed={!d.states.length} onClick={() => pick('')}
+            className={`mt-3 flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left ${!d.states.length ? 'border-brand bg-brand-soft' : 'border-line bg-white hover:border-[#bfc1b8]'}`}>
             <span className="font-semibold">All states together</span>
             <span className="tabular-nums text-ink-2">{everyone.toLocaleString()}</span>
           </button>
@@ -349,7 +350,7 @@ export default function CampaignEditor(props: {
             </div>
             <dl className="divide-y divide-line rounded-xl border border-line bg-white text-sm">
               {[
-                ['State', place],
+                ['States', picked.length ? picked.map((s) => s.code).join(', ') : 'All states'],
                 ['People', audience.toLocaleString()],
                 ['Batches', `${schedule(audience, d.warmup, props.context).length}, starting with ${(schedule(audience, d.warmup, props.context)[0]?.size || 0).toLocaleString()}`],
                 ['Subject', d.subject],

@@ -25,12 +25,12 @@ function Body({ s }: { s: StateRow }) {
 
 const CARD = 'block w-full rounded-2xl border bg-white p-4 text-left shadow-card transition-colors'
 
-export default function StateCards({ states, selected, onPick }: { states: StateRow[]; selected?: string; onPick?: (code: string) => void }) {
+export default function StateCards({ states, selected, onPick }: { states: StateRow[]; selected?: string[]; onPick?: (code: string) => void }) {
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
       {states.map((s) => onPick ? (
-        <button key={s.code} type="button" aria-pressed={selected === s.code} onClick={() => onPick(s.code)}
-          className={`${CARD} ${selected === s.code ? 'border-brand ring-2 ring-brand/25' : 'border-line hover:border-[#bfc1b8]'}`}><Body s={s} /></button>
+        <button key={s.code} type="button" aria-pressed={!!selected?.includes(s.code)} onClick={() => onPick(s.code)}
+          className={`${CARD} ${selected?.includes(s.code) ? 'border-brand ring-2 ring-brand/25' : 'border-line hover:border-[#bfc1b8]'}`}><Body s={s} /></button>
       ) : (
         <Link key={s.code} href={`/campaigns/new?state=${s.code}`} prefetch={false} className={`${CARD} border-line hover:border-brand`}><Body s={s} /></Link>
       ))}

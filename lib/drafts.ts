@@ -1,10 +1,17 @@
-import { getKv, run, setKv } from './db'
+import { getKv, one, run, setKv } from './db'
 import data from './seriesDrafts.json'
 
-/** Puts the prepared state series in as drafts once. A draft you delete stays deleted. */
+const OLD = ['Texas', 'Alabama', 'Florida', 'North Carolina', 'Mississippi', 'Louisiana'].map((s) => `${s}, 6-email series`)
+
+/** Puts the prepared series in as drafts once. A draft you delete stays deleted. */
 export async function ensureDrafts() {
+  // the six single-state drafts became one "Other states" campaign
+  const marks = OLD.map(() => '?').join(',')
+  const started = await one(`SELECT 1 x FROM campaigns WHERE name IN (${marks}) AND status != 'draft' LIMIT 1`, OLD)
+  if (!started) await run(`DELETE FROM campaigns WHERE name IN (${marks}) AND status = 'draft'`, OLD)
   for (const d of data as { key: string; name: string; state: string; emails: { subject: string; preheader: string; html: string; day: number }[] }[]) {
     if (await getKv(`draft:${d.key}`)) continue
+    if (started && d.key === 'other-series-1') continue   // those states are already being emailed
     await setKv(`draft:${d.key}`, '1')
     const [first, ...rest] = d.emails
     await run('INSERT INTO campaigns (name, subject, preheader, html, states, warmup, list_name, sequence, created_at) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?)',

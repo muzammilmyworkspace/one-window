@@ -18,7 +18,7 @@ export default async function Campaigns() {
     FROM campaigns c WHERE c.auto_child = 0 ORDER BY c.created_at DESC`)
   const states = await stateOverview()
   const series = rows.filter((c) => c.status === 'draft' && c.sequence)
-  const everyone = series.reduce((a, c) => a + (states.find((s) => s.code === c.states)?.total || 0), 0)
+  const everyone = series.reduce((a, c) => a + String(c.states).split(',').reduce((n, code) => n + (states.find((s) => s.code === code)?.total || 0), 0), 0)
   return (
     <>
       <PageHead title="Campaigns" sub="Pick a state to write its email.">

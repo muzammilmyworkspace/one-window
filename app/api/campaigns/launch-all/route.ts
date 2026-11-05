@@ -3,7 +3,7 @@ import { all } from '@/lib/db'
 import { startCampaign } from '@/lib/engine'
 
 // Warm lists first, the large cold list last: the queue runs in this order.
-const ORDER = ['GA', 'TX', 'AL', 'FL', 'NC', 'MS', 'LA', 'IL']
+const ORDER = ['GA', 'AL,FL,LA,MS,NC,TX', 'IL']
 
 export const POST = route(async (req: Request) => {
   if (!(await req.json()).permission) return fail('Confirm first that you are allowed to email these people')
