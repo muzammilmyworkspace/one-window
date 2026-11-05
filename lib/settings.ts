@@ -10,6 +10,7 @@ export const SETTING_DEFAULTS = {
   reason: "You're receiving this because you previously asked about health coverage.",
   gap_seconds: '30',
   webmail_url: 'https://mail.hostinger.com',
+  top_note: 'Open now · Ends Jan 15',
   assets_url: 'https://www.thesupportlife.com/email',
   website_url: 'https://www.thesupportlife.com',
   phone: '(872) 217-1852',

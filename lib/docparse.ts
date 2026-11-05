@@ -70,6 +70,7 @@ export function buildEmail(input: Block[]): ParsedDoc {
 
   const parts: string[] = []
   if (first) parts.push(e.h1(inline(first.text)))
+  parts.push(e.split('upload'))
   if (!greeted) parts.push(e.p('Hi {{first_name}},'))
   const signed = blocks.slice(-4).some((b) => /^(thanks|thank you|regards|sincerely|best)\b/i.test(b.text))
 
@@ -90,8 +91,8 @@ export function buildEmail(input: Block[]): ParsedDoc {
   }
   const signoff = parts.findLastIndex((x) => /thanks|thank you|regards|sincerely/i.test(x))
   const button = e.btn('Check my options', 'upload')
-  if (signed && signoff >= 0) parts.splice(signoff, 0, button)
-  else parts.push(button)
+  if (signed && signoff >= 0) parts.splice(signoff, 0, e.friend(), button)
+  else parts.push(e.friend(), button)
   if (!signed) parts.push(e.p('Thanks,<br><strong>The Support Life team</strong>'))
   return { subject, preheader, html: parts.join('\n') }
 }

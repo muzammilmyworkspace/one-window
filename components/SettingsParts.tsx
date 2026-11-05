@@ -59,6 +59,7 @@ const FIELDS: { key: keyof Settings; label: string; hint?: string; long?: boolea
   { key: 'reply_to', label: 'Replies go to', hint: 'Your Hostinger mailbox.' },
   { key: 'gap_seconds', label: 'Seconds between emails', hint: 'Spacing them out helps keep mail out of spam.' },
   { key: 'webmail_url', label: 'Webmail link' },
+  { key: 'top_note', label: 'Badge at the top of the email', hint: 'Update it after the deadline. Leave empty to hide it.' },
   { key: 'website_url', label: 'Website' },
   { key: 'phone', label: 'Phone in the footer' },
   { key: 'facebook_url', label: 'Facebook link', hint: 'Leave a link empty to hide its icon.' },
