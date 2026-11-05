@@ -21,7 +21,7 @@ const WHERE: Record<string, string> = {
 }
 const PAGE = 50
 
-export default async function CampaignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ f?: string; p?: string }> }) {
+export default async function CampaignPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ f?: string; p?: string; step?: string }> }) {
   const id = Number((await params).id)
   const q = await searchParams
   const c = await one('SELECT * FROM campaigns WHERE id = ?', [id])
@@ -31,9 +31,9 @@ export default async function CampaignPage({ params, searchParams }: { params: P
     return (
       <>
         <PageHead title={String(c.name)} sub={<Link href="/campaigns" className="hover:underline">Back to campaigns</Link>} />
-        <CampaignEditor {...await editorData()} templates={TEMPLATES} initial={{
+        <CampaignEditor {...await editorData()} templates={TEMPLATES} startStep={Number(q.step) || 0} initial={{
           id, name: String(c.name), subject: String(c.subject), preheader: String(c.preheader), html: String(c.html),
-          states: String(c.states).split(',').filter(Boolean), follow_up_of: c.follow_up_of ? Number(c.follow_up_of) : null, warmup: !!c.warmup, list_name: String(c.list_name), reason: String(c.reason), followup_key: String(c.followup_key), followup_days: Number(c.followup_days),
+          states: String(c.states).split(',').filter(Boolean), follow_up_of: c.follow_up_of ? Number(c.follow_up_of) : null, warmup: !!c.warmup, list_name: String(c.list_name), reason: String(c.reason), followup_key: String(c.followup_key), followup_days: Number(c.followup_days), sequence: c.sequence ? JSON.parse(String(c.sequence)) : [],
         }} />
       </>
     )
@@ -50,6 +50,7 @@ export default async function CampaignPage({ params, searchParams }: { params: P
   ])
   const pages = Math.max(1, Math.ceil(Number(count?.n || 0) / PAGE))
   const child = await one('SELECT id, name, followup_days FROM campaigns WHERE follow_up_of = ? AND auto_child = 1', [id])
+  const series = c.sequence ? (JSON.parse(String(c.sequence)) as { subject: string; day: number }[]) : []
   const plan = schedule(stats.queued, !!c.warmup, await planContext(Number(c.started_at)))
   const link = (nf: string, p = 1) => `/campaigns/${id}?f=${nf}&p=${p}`
 
@@ -120,7 +121,9 @@ export default async function CampaignPage({ params, searchParams }: { params: P
             <SendingPlan slots={plan} />
             <div className="mt-4 border-t border-line pt-4">
               <h3 className="mb-2 text-sm">Automatic follow-up</h3>
-              {child ? (
+              {series.length ? (
+                <ol className="space-y-1 text-sm text-ink-2">{series.map((e, i) => <li key={i}><b className="text-ink">Day {e.day}:</b> {e.subject}</li>)}</ol>
+              ) : child ? (
                 <p className="text-sm text-ink-2">On: <Link href={`/campaigns/${child.id}`} className="font-semibold text-brand-dark hover:underline">{Number(child.followup_days)} days after each email</Link></p>
               ) : <FollowupSetup id={id} templates={TEMPLATES.filter((t) => t.key.includes('2') || t.key.endsWith('followup')).map((t) => ({ key: t.key, label: t.label }))} initial={String(c.list_name).startsWith('business') ? 'b2' : 'email2'} />}
             </div>

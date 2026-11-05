@@ -11,8 +11,9 @@ import { Icon } from './ui'
 
 export interface Draft {
   id?: number; name: string; subject: string; preheader: string; html: string; states: string[]; follow_up_of: number | null
-  warmup: boolean; list_name: string; reason: string; followup_key: string; followup_days: number
+  warmup: boolean; list_name: string; reason: string; followup_key: string; followup_days: number; sequence: Step[]
 }
+interface Step { subject: string; preheader: string; html: string; day: number }
 interface Template { key: string; subject: string; preheader: string; html: string; list: string }
 interface Check { label: string; ok: boolean; blocking: boolean; help: string }
 
@@ -32,6 +33,10 @@ export default function CampaignEditor(props: {
   const [d, setD] = useState<Draft>({ ...props.initial, list_name: '' })
   const [html, setHtml] = useState(props.initial.html)
   const [step, setStep] = useState(props.startStep || 0)
+  const [active, setActive] = useState(0)
+  const [saved, setSaved] = useState(!!props.initial.id)
+  const idRef = useRef(props.initial.id)
+  const saving = useRef(false)
   const [editing, setEditing] = useState(false)
   const [preview, setPreview] = useState({ subject: '', html: '' })
   const [note, setNote] = useState<{ ok: boolean; text: string } | null>(null)
@@ -45,22 +50,38 @@ export default function CampaignEditor(props: {
   const [permission, setPermission] = useState(false)
   const editor = useRef<HTMLDivElement>(null)
   const file = useRef<HTMLInputElement>(null)
+  const series = d.sequence || []
+  const cur = active === 0 ? { subject: d.subject, preheader: d.preheader, html } : series[active - 1]
 
   useEffect(() => {
-    if (editing && step === 1 && editor.current && editor.current.innerHTML !== html) editor.current.innerHTML = html
-  }, [html, editing, step])
+    if (editing && step === 1 && editor.current && editor.current.innerHTML !== cur.html) editor.current.innerHTML = cur.html
+  }, [cur.html, editing, step, active])
 
   const code = d.states[0] || ''
   useEffect(() => {
     const t = setTimeout(async () => {
-      const r = await post('/api/preview', { subject: d.subject, preheader: d.preheader, html, reason: d.reason, state: code })
+      const r = await post('/api/preview', { subject: cur.subject, preheader: cur.preheader, html: cur.html, reason: d.reason, state: code })
       if (r.ok) setPreview(await r.json())
     }, 300)
     return () => clearTimeout(t)
-  }, [d.subject, d.preheader, d.reason, html, code])
+  }, [cur.subject, cur.preheader, d.reason, cur.html, code])
 
-  const set = (patch: Partial<Draft>) => setD((p) => ({ ...p, ...patch }))
-  const sync = () => { if (editor.current) setHtml(editor.current.innerHTML) }
+  const set = (patch: Partial<Draft>) => { setSaved(false); setD((p) => ({ ...p, ...patch })) }
+  function patchCur(p: Partial<Step>) {
+    if (active === 0) { if (p.html !== undefined) { setSaved(false); setHtml(p.html) } if (p.subject !== undefined || p.preheader !== undefined) set({ ...(p.subject !== undefined && { subject: p.subject }), ...(p.preheader !== undefined && { preheader: p.preheader }) }) }
+    else set({ sequence: series.map((e, i) => (i === active - 1 ? { ...e, ...p } : e)) })
+  }
+  const tabs = series.length > 0 && (
+    <div className="mb-4 flex flex-wrap gap-1.5" aria-label="Emails in this series">
+      {[{ day: 1 }, ...series].map((e, i) => (
+        <button key={i} type="button" aria-pressed={active === i} onClick={() => { if (editing) { sync(); setEditing(false) } setActive(i) }}
+          className={`rounded-lg border px-3 py-1.5 text-sm font-bold ${active === i ? 'border-brand bg-brand-soft text-brand-dark' : 'border-line bg-white text-ink-2 hover:border-[#bfc1b8]'}`}>
+          Email {i + 1} <span className="font-semibold opacity-70">Day {e.day}</span>
+        </button>
+      ))}
+    </div>
+  )
+  const sync = () => { if (editor.current) patchCur({ html: editor.current.innerHTML }) }
   const cmd = (name: string, value?: string) => { editor.current?.focus(); document.execCommand(name, false, value); sync() }
 
   const picked = props.states.find((s) => s.code === code)
@@ -85,17 +106,24 @@ export default function CampaignEditor(props: {
     setReading(false)
     if (file.current) file.current.value = ''
     if (!res.ok) { setNote({ ok: false, text: data.error }); return }
-    set({ subject: data.subject, preheader: data.preheader })
-    setHtml(data.html)
     setEditing(false)
-    setNote({ ok: true, text: `${f.name} added.` })
+    setActive(0)
+    if (data.emails) {
+      const [first, ...rest] = data.emails as Step[]
+      set({ subject: first.subject, preheader: first.preheader, sequence: rest, followup_key: '', followup_days: 0 })
+      setHtml(first.html)
+      setNote({ ok: true, text: `${f.name}: ${data.emails.length} emails added.` })
+    } else {
+      set({ subject: data.subject, preheader: data.preheader, sequence: [] })
+      setHtml(data.html)
+      setNote({ ok: true, text: `${f.name} added.` })
+    }
   }
 
   function usePrepared() {
     const t = props.templates.find((x) => x.list === 'clients')
     if (!t) return
-    set({ subject: t.subject, preheader: t.preheader })
-    setHtml(t.html)
+    patchCur({ subject: t.subject, preheader: t.preheader, html: t.html })
     setEditing(false)
   }
 
@@ -112,13 +140,29 @@ export default function CampaignEditor(props: {
 
   async function save(): Promise<number | null> {
     if (editing && step === 1) sync()
-    const payload = { ...d, name: d.name || `${place}, ${month()}`, html: html || '<p></p>', subject: d.subject || '(no subject yet)' }
-    const res = d.id ? await post(`/api/campaigns/${d.id}`, payload, 'PUT') : await post('/api/campaigns', payload)
-    const data = await res.json()
-    if (!res.ok) { setNote({ ok: false, text: data.error }); return null }
-    if (!d.id) { set({ id: data.id }); window.history.replaceState(null, '', `/campaigns/${data.id}`) }
-    return d.id || data.id
+    while (saving.current) await new Promise((r) => setTimeout(r, 50))
+    saving.current = true
+    try {
+      const payload = { ...d, name: d.name || `${place}, ${month()}`, html: html || '<p></p>', subject: d.subject || '(no subject yet)' }
+      const res = idRef.current ? await post(`/api/campaigns/${idRef.current}`, payload, 'PUT') : await post('/api/campaigns', payload)
+      const data = await res.json()
+      if (!res.ok) { setNote({ ok: false, text: data.error }); return null }
+      if (!idRef.current) { idRef.current = data.id; setD((p) => ({ ...p, id: data.id })) }
+      setSaved(true)
+      return idRef.current!
+    } finally { saving.current = false }
   }
+
+  // Everything is kept as you type, so a refresh loses nothing.
+  useEffect(() => {
+    if (saved || !(d.subject.trim() || html.replace(/<[^>]+>/g, '').trim())) return
+    const t = setTimeout(() => { save() }, 1500)
+    return () => clearTimeout(t)
+  }, [d, html, saved])
+
+  useEffect(() => {
+    if (idRef.current) window.history.replaceState(null, '', `/campaigns/${idRef.current}?step=${step}`)
+  }, [step, d.id])
 
   function problem(): string {
     if (step === 0 && !total) return 'There is nobody in this state yet.'
@@ -146,7 +190,7 @@ export default function CampaignEditor(props: {
   async function test() {
     setBusy(true)
     setNote(null)
-    const res = await post('/api/test-send', { to: testTo, subject: d.subject, preheader: d.preheader, html, reason: d.reason, state: code })
+    const res = await post('/api/test-send', { to: testTo, subject: cur.subject, preheader: cur.preheader, html: cur.html, reason: d.reason, state: code })
     const data = await res.json()
     setBusy(false)
     setNote(res.ok ? { ok: true, text: data.message } : { ok: false, text: data.error })
@@ -157,16 +201,16 @@ export default function CampaignEditor(props: {
     setBusy(true)
     setNote(null)
     if (!(await save())) { setBusy(false); return }
-    const res = await post(`/api/campaigns/${d.id}`, { action: 'start' })
+    const res = await post(`/api/campaigns/${idRef.current}`, { action: 'start' })
     const data = await res.json()
     setBusy(false)
     if (!res.ok) { setNote({ ok: false, text: data.error }); return }
-    window.location.href = `/campaigns/${d.id}`
+    window.location.href = `/campaigns/${idRef.current}`
   }
 
   async function remove() {
-    if (!d.id || !window.confirm('Delete this draft?')) return
-    await fetch(`/api/campaigns/${d.id}`, { method: 'DELETE' })
+    if (!idRef.current || !window.confirm('Delete this draft?')) return
+    await fetch(`/api/campaigns/${idRef.current}`, { method: 'DELETE' })
     router.push('/campaigns')
     router.refresh()
   }
@@ -209,6 +253,7 @@ export default function CampaignEditor(props: {
           <div className="min-w-0 space-y-5">
             <div className="card p-5">
               <h2 className="text-xl">Email for {place}</h2>
+              <div className="mt-3">{tabs}</div>
               <input ref={file} type="file" accept=".pdf,.docx,.txt" className="sr-only" aria-label="Content file" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
               <button type="button" disabled={reading} onClick={() => file.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)}
@@ -221,9 +266,9 @@ export default function CampaignEditor(props: {
               <button type="button" onClick={usePrepared} className="mt-2 text-sm font-semibold text-brand-dark hover:underline">Or use our ready email</button>
 
               <label htmlFor="c-subject" className="label mt-5">Subject line</label>
-              <input id="c-subject" className="field" value={d.subject} onChange={(e) => set({ subject: e.target.value })} />
+              <input id="c-subject" className="field" value={cur.subject} onChange={(e) => patchCur({ subject: e.target.value })} />
               <label htmlFor="c-pre" className="label mt-4">Preview text <span className="font-normal text-ink-3">Optional</span></label>
-              <input id="c-pre" className="field" value={d.preheader} onChange={(e) => set({ preheader: e.target.value })} />
+              <input id="c-pre" className="field" value={cur.preheader} onChange={(e) => patchCur({ preheader: e.target.value })} />
               <p className="hint">{'{{first_name}}'} and {'{{state_name}}'} fill in by themselves.</p>
             </div>
 
@@ -274,6 +319,7 @@ export default function CampaignEditor(props: {
             <span className="text-sm leading-snug"><b>Start slowly</b> <span className="text-ink-3">(recommended)</span><br /><span className="text-ink-2">The whole domain sends 100, then 200, then 300 a day, then the full limit.</span></span>
           </label>
           <div className="mt-4"><SendingPlan slots={slots} /></div>
+          {series.length > 0 && <p className="mt-3 text-sm text-ink-2">This is Email 1. The other {series.length} emails go out by themselves on days {series.map((e) => e.day).join(', ')} of each person&apos;s series, and stop for anyone who replies.</p>}
           <p className="mt-3 text-sm font-semibold text-ink-2">All batches are scheduled together when you launch. Nothing else to do.</p>
         </section>
       )}
@@ -283,6 +329,7 @@ export default function CampaignEditor(props: {
           <div className="card self-start p-6">
             <h2 className="text-xl">Send yourself a test</h2>
             <p className="mt-1 text-sm text-ink-2">See it in your own inbox. Look in spam too.</p>
+            {series.length > 0 && <div className="mt-3">{tabs}</div>}
             <div className="mt-4 space-y-2">
               <input aria-label="Your email" type="email" autoFocus className="field" placeholder="you@gmail.com" value={testTo} onChange={(e) => setTestTo(e.target.value)} />
               <button type="button" disabled={busy || !testTo} onClick={test} className="btn btn-primary w-full"><Icon name="send" size={15} /> Send test</button>
@@ -305,12 +352,15 @@ export default function CampaignEditor(props: {
                 ['State', place],
                 ['People', audience.toLocaleString()],
                 ['Batches', `${schedule(audience, d.warmup, props.context).length}, starting with ${(schedule(audience, d.warmup, props.context)[0]?.size || 0).toLocaleString()}`],
-                ['Subject', preview.subject],
+                ['Subject', d.subject],
                 ['Replies', 'info@ and the Inbox page'],
               ].map(([k, v]) => (
                 <div key={k} className="flex gap-3 px-4 py-2.5"><dt className="w-20 flex-none text-ink-3">{k}</dt><dd className="min-w-0 break-words font-semibold">{v}</dd></div>
               ))}
             </dl>
+            {series.length > 0 ? (
+              <p className="rounded-xl border border-line bg-white p-3 text-sm"><b>{series.length + 1} emails in this series.</b> <span className="text-ink-2">They go out automatically and stop for anyone who replies.</span></p>
+            ) : (
             <label className="flex items-start gap-2.5 rounded-xl border border-line bg-white p-3">
               <input type="checkbox" checked={!!d.followup_key} onChange={(e) => set({ followup_key: e.target.checked ? followupFor('') : '', followup_days: e.target.checked ? d.followup_days || 5 : 0 })} className="mt-0.5 h-4 w-4 accent-[#2b4deb]" />
               <span className="text-sm leading-snug"><b>Send a follow-up automatically</b><br />
@@ -318,6 +368,7 @@ export default function CampaignEditor(props: {
                   <input aria-label="Days" type="number" min={1} max={30} value={d.followup_days || 5} onChange={(e) => set({ followup_days: Number(e.target.value) })} className="mx-1.5 w-12 rounded border border-line px-1 text-center" />
                   days later. Anyone who replied is skipped.</span></span>
             </label>
+            )}
             <label className="flex items-start gap-2.5 rounded-xl bg-sun-soft p-3">
               <input type="checkbox" checked={permission} onChange={(e) => setPermission(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#2b4deb]" />
               <span className="text-sm font-semibold leading-snug text-sun-ink">We are allowed to email these people.</span>
@@ -342,8 +393,8 @@ export default function CampaignEditor(props: {
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-line bg-white/95 backdrop-blur lg:left-60">
         <div className="mx-auto flex max-w-[1180px] flex-wrap items-center gap-2 px-4 py-3 sm:px-6 lg:px-8">
           {step > 0 && <button type="button" disabled={busy} onClick={() => { setNote(null); setStep(step - 1) }} className="btn btn-ghost">Back</button>}
-          {d.id && <button type="button" disabled={busy} onClick={remove} className="btn btn-danger">Delete draft</button>}
-          <p role="status" className={`min-w-0 flex-1 truncate px-2 text-sm font-semibold ${note ? (note.ok ? 'text-good' : 'text-bad') : ''}`}>{note?.text}</p>
+          {idRef.current && <button type="button" disabled={busy} onClick={remove} className="btn btn-danger">Delete draft</button>}
+          <p role="status" className={`min-w-0 flex-1 truncate px-2 text-sm font-semibold ${note ? (note.ok ? 'text-good' : 'text-bad') : 'text-ink-3'}`}>{note?.text || (idRef.current ? (saved ? 'Saved' : 'Saving…') : '')}</p>
           {step < 4
             ? <button type="button" disabled={busy || reading} onClick={next} className="btn btn-primary">{step === 3 ? (tested ? 'Continue' : 'Skip for now') : 'Continue'}</button>
             : <button type="button" disabled={busy || !permission || blocked || !audience} onClick={launch} className="btn btn-primary"><Icon name="send" size={15} /> Launch campaign</button>}

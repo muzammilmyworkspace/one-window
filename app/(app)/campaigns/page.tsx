@@ -2,16 +2,18 @@ import Link from 'next/link'
 import { all } from '@/lib/db'
 import StateCards from '@/components/StateCards'
 import { Empty, Icon, Meter, PageHead, pct, StatusBadge, when } from '@/components/ui'
+import { ensureDrafts } from '@/lib/drafts'
 import { stateOverview } from '@/lib/editorData'
 import { stateName } from '@/lib/lists'
 
 export default async function Campaigns() {
+  await ensureDrafts()
   const rows = await all(`SELECT c.*,
     (SELECT COUNT(*) FROM sends s WHERE s.campaign_id = c.id) total,
     (SELECT COUNT(*) FROM sends s WHERE s.campaign_id = c.id AND s.sent_at IS NOT NULL) sent,
     (SELECT COUNT(*) FROM sends s WHERE s.campaign_id = c.id AND s.replied_at IS NOT NULL) replied,
     (SELECT COUNT(*) FROM sends s WHERE s.campaign_id = c.id AND s.bounced_at IS NOT NULL) bounced
-    FROM campaigns c ORDER BY c.created_at DESC`)
+    FROM campaigns c WHERE c.auto_child = 0 ORDER BY c.created_at DESC`)
   const states = await stateOverview()
   return (
     <>

@@ -74,3 +74,7 @@ Batches poore domain ke hisaab se bante hain: warm-up 100, 200, 300 roz, phir po
 ## Replies aur sales
 
 Jo reply kare us ka status "With sales" ho jata hai: follow-up aur aage ki har campaign band. Inbox ka Export for sales button un sab ki CSV deta hai. Contacts page par With sales filter se bhi dikhte hain.
+
+## Email series
+
+Word file mein kai emails hon (har ek "Hi," se shuru aur signature par khatam) to tool unhein khud alag kar deta hai: tabs mein Email 1, 2, 3... aur din 1, 3, 6, 9, 12, 16. Launch ke baad har email pichli email ke din ginti se khud jati hai, aur reply, bounce ya unsubscribe par ruk jati hai. Sab kuch type karte hi save hota hai.

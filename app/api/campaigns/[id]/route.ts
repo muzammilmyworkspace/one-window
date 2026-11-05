@@ -15,8 +15,8 @@ export const PUT = route(async (req: Request, ctx: Ctx) => {
   const id = Number((await ctx.params).id)
   const b = await req.json()
   if (!String(b.name || '').trim()) return fail('Give the campaign a name')
-  const r = await run("UPDATE campaigns SET name = ?, subject = ?, preheader = ?, html = ?, states = ?, follow_up_of = ?, warmup = ?, list_name = ?, reason = ?, followup_key = ?, followup_days = ? WHERE id = ? AND status = 'draft'",
-    [b.name.trim(), b.subject.trim(), String(b.preheader || '').trim(), b.html, (b.states || []).join(','), b.follow_up_of ? Number(b.follow_up_of) : null, b.warmup ? 1 : 0, b.list_name || '', String(b.reason || '').trim(), b.followup_key || '', Math.max(0, Number(b.followup_days) || 0), id])
+  const r = await run("UPDATE campaigns SET name = ?, subject = ?, preheader = ?, html = ?, states = ?, follow_up_of = ?, warmup = ?, list_name = ?, reason = ?, followup_key = ?, followup_days = ?, sequence = ? WHERE id = ? AND status = 'draft'",
+    [b.name.trim(), b.subject.trim(), String(b.preheader || '').trim(), b.html, (b.states || []).join(','), b.follow_up_of ? Number(b.follow_up_of) : null, b.warmup ? 1 : 0, b.list_name || '', String(b.reason || '').trim(), b.followup_key || '', Math.max(0, Number(b.followup_days) || 0), b.sequence?.length ? JSON.stringify(b.sequence) : '', id])
   if (!r.changes) return fail('Only a draft can be edited')
   return json({ ok: true })
 })

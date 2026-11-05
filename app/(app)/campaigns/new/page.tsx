@@ -13,7 +13,7 @@ export default async function NewCampaign({ searchParams }: { searchParams: Prom
     <>
       <PageHead title="New campaign" />
       <CampaignEditor {...data} templates={TEMPLATES} startStep={state ? 1 : 0}
-        initial={{ name: state ? `${stateName(state)}, ${month}` : '', subject: '', preheader: '', html: '', states: state ? [state] : [], follow_up_of: null, warmup: true, list_name: '', reason: '', followup_key: 'email2', followup_days: 5 }} />
+        initial={{ name: state ? `${stateName(state)}, ${month}` : '', subject: '', preheader: '', html: '', states: state ? [state] : [], follow_up_of: null, warmup: true, list_name: '', reason: '', followup_key: 'email2', followup_days: 5, sequence: [] }} />
     </>
   )
 }

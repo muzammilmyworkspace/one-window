@@ -42,8 +42,22 @@ export async function startCampaign(id: number): Promise<number> {
     ORDER BY CASE c.list_name WHEN 'clients' THEN 0 WHEN 'business' THEN 1 ELSE 2 END, c.id`, [id, ...args])
   if (!r.changes) throw new Error('Nobody matches this campaign')
   await run("UPDATE campaigns SET status = 'running', started_at = ? WHERE id = ?", [Date.now(), id])
-  if (c.followup_key && Number(c.followup_days) > 0) await attachFollowup(id, String(c.followup_key), Number(c.followup_days))
+  const series = c.sequence ? (JSON.parse(String(c.sequence)) as { subject: string; preheader: string; html: string; day: number }[]) : []
+  if (series.length) await attachSeries(id, c, series)
+  else if (c.followup_key && Number(c.followup_days) > 0) await attachFollowup(id, String(c.followup_key), Number(c.followup_days))
   return r.changes
+}
+
+/** Links each email of a series to the one before it, so only people who did not answer move on. */
+async function attachSeries(parentId: number, p: Record<string, unknown>, series: { subject: string; preheader: string; html: string; day: number }[]) {
+  let previous = parentId, lastDay = 1
+  for (const [i, step] of series.entries()) {
+    const r = await run(`INSERT INTO campaigns (name, subject, preheader, html, status, follow_up_of, list_name, reason, followup_days, warmup, auto_child, created_at, started_at)
+      VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?, ?, 1, ?, ?)`,
+      [`${p.name} (email ${i + 2})`, step.subject, step.preheader, step.html, previous, String(p.list_name), String(p.reason || ''), Math.max(1, step.day - lastDay), Number(p.warmup), Date.now(), Date.now()])
+    previous = r.id
+    lastDay = step.day
+  }
 }
 
 /** Adds an automatic follow-up to a campaign, also one that has already gone out. */
@@ -212,8 +226,8 @@ export async function retryFailed(id: number): Promise<number> {
 export async function duplicateCampaign(id: number): Promise<number> {
   const c = await one('SELECT * FROM campaigns WHERE id = ?', [id])
   if (!c) throw new Error('Campaign not found')
-  const r = await run('INSERT INTO campaigns (name, subject, preheader, html, states, follow_up_of, warmup, list_name, reason, followup_key, followup_days, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    [`${c.name} (copy)`, c.subject as string, c.preheader as string, c.html as string, c.states as string, (c.follow_up_of ?? null) as number | null, Number(c.warmup), c.list_name as string, c.reason as string, c.followup_key as string, Number(c.followup_days), Date.now()])
+  const r = await run('INSERT INTO campaigns (name, subject, preheader, html, states, follow_up_of, warmup, list_name, reason, followup_key, followup_days, sequence, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [`${c.name} (copy)`, c.subject as string, c.preheader as string, c.html as string, c.states as string, (c.follow_up_of ?? null) as number | null, Number(c.warmup), c.list_name as string, c.reason as string, c.followup_key as string, Number(c.followup_days), c.sequence as string, Date.now()])
   return r.id
 }
 

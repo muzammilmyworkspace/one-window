@@ -45,7 +45,17 @@ const stats = (items: [string, string][]) =>
 <p style="margin:5px 0 0;font-size:12px;line-height:1.3;color:#4A6A60;">${l}</p>
 </td></tr></table></td>`).join('')}</tr></table>`
 
-export const emailBlocks = { p, h1, box, btn, row, rows, heading, stats, split, friend }
+const checks = (items: string[]) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 18px;"><tr><td bgcolor="${SOFT}" style="background:${SOFT};border-radius:12px;padding:14px 16px;">
+${items.map((t) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td width="24" valign="top" style="padding:3px 0;color:${G};font-weight:bold;">&#10003;</td><td style="padding:3px 0;font-size:15px;line-height:1.45;color:${DEEP};">${t}</td></tr></table>`).join('\n')}
+</td></tr></table>`
+const reply = (text: string, word: string) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:6px 0 20px;"><tr><td bgcolor="${DEEP}" style="background:${DEEP};border-radius:14px;padding:18px 20px;">
+<p style="margin:0;font-size:16px;line-height:1.45;font-weight:bold;color:#ffffff;">${text}</p>
+${word ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:12px;"><tr><td align="center" bgcolor="${SUN}" style="background:${SUN};border-radius:11px;"><a href="sms:+18722171852?body=${encodeURIComponent(word)}" style="display:block;padding:14px 16px;color:${DEEP};text-decoration:none;font-size:16px;font-weight:bold;">Text ${word} &rarr;</a></td></tr></table>` : ''}
+</td></tr></table>`
+const sign = (t: string) => `<p style="margin:0 0 14px;"><strong style="color:${DEEP};">${t.replace(/\s*The Support Life\s*/, '<br>The Support Life<br>').replace(/<br>\s*$/, '')}</strong></p>`
+const source = (t: string) => `<p style="margin:0 0 14px;font-size:12px;line-height:1.4;color:#7D9188;">Source: ${t}</p>`
+
+export const emailBlocks = { p, h1, box, btn, row, rows, heading, stats, split, friend, checks, reply, sign, source }
 
 export const TEMPLATES = [
   {

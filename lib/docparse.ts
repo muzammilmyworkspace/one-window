@@ -97,21 +97,25 @@ export function buildEmail(input: Block[]): ParsedDoc {
   return { subject, preheader, html: parts.join('\n') }
 }
 
-export async function parseDocument(name: string, buf: ArrayBuffer): Promise<ParsedDoc> {
+export async function readBlocks(name: string, buf: ArrayBuffer): Promise<Block[]> {
   if (buf.byteLength > MAX_BYTES) throw new Error('This file is over 4 MB. Please use a smaller one.')
   const lower = name.toLowerCase()
   if (lower.endsWith('.docx')) {
     const mammoth = (await import('mammoth')).default
     const { value } = await mammoth.convertToHtml({ buffer: Buffer.from(buf) })
-    return buildEmail(htmlBlocks(value))
+    return htmlBlocks(value)
   }
   if (lower.endsWith('.pdf')) {
     const { extractText, getDocumentProxy } = await import('unpdf')
     const pdf = await getDocumentProxy(new Uint8Array(buf))
     const { text } = await extractText(pdf, { mergePages: true })
-    return buildEmail(textBlocks(text))
+    return textBlocks(text)
   }
-  if (lower.endsWith('.txt')) return buildEmail(textBlocks(new TextDecoder().decode(buf)))
+  if (lower.endsWith('.txt')) return textBlocks(new TextDecoder().decode(buf))
   if (lower.endsWith('.doc')) throw new Error('Old .doc files cannot be read. In Word, save it as .docx and upload again.')
   throw new Error('Please upload a PDF, Word (.docx) or text file.')
+}
+
+export async function parseDocument(name: string, buf: ArrayBuffer): Promise<ParsedDoc> {
+  return buildEmail(await readBlocks(name, buf))
 }

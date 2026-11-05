@@ -103,6 +103,7 @@ const COLUMNS = [
   "ALTER TABLE campaigns ADD COLUMN followup_key TEXT NOT NULL DEFAULT ''",
   'ALTER TABLE campaigns ADD COLUMN followup_days INTEGER NOT NULL DEFAULT 0',
   'ALTER TABLE campaigns ADD COLUMN auto_child INTEGER NOT NULL DEFAULT 0',
+  "ALTER TABLE campaigns ADD COLUMN sequence TEXT NOT NULL DEFAULT ''",
   "UPDATE contacts SET status = 'replied' WHERE status = 'active' AND id IN (SELECT contact_id FROM replies WHERE kind = 'reply')",
 ]
 
