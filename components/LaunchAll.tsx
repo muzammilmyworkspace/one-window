@@ -29,7 +29,7 @@ export default function LaunchAll({ drafts, people, live }: { drafts: number; pe
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-labelledby="la-title">
           <div className="card w-full max-w-md p-6">
             <h2 id="la-title" className="text-xl">Launch {drafts} series to {people.toLocaleString()} people?</h2>
-            <p className="mt-2 text-sm text-ink-2">Every series is scheduled at once and sends by itself, Georgia first and Illinois last. Anyone who replies, bounces or unsubscribes stops getting emails.</p>
+            <p className="mt-2 text-sm text-ink-2">Every series is scheduled at once and sends by itself: Illinois first, then Georgia, then the other states. Anyone who replies, bounces or unsubscribes stops getting emails.</p>
             <label className="mt-4 flex items-start gap-2.5 rounded-xl bg-sun-soft p-3">
               <input type="checkbox" checked={permission} onChange={(e) => setPermission(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#2b4deb]" />
               <span className="text-sm font-semibold leading-snug text-sun-ink">We are allowed to email these people.</span>

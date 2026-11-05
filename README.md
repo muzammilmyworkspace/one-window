@@ -81,4 +81,4 @@ Word file mein kai emails hon (har ek "Hi," se shuru aur signature par khatam) t
 
 ## Saari states ek saath
 
-Campaigns page par Launch all har state ki series ek saath schedule karta hai: Georgia pehle, Illinois aakhir mein. Settings ki upar wali line mein database aur contacts ki ginti dikhti hai.
+Campaigns page par Launch all har series ek saath schedule karta hai: Illinois pehle, phir Georgia, phir baqi states. Settings ki upar wali line mein database aur contacts ki ginti dikhti hai.

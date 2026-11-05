@@ -71,6 +71,12 @@ export default function CampaignEditor(props: {
     if (active === 0) { if (p.html !== undefined) { setSaved(false); setHtml(p.html) } if (p.subject !== undefined || p.preheader !== undefined) set({ ...(p.subject !== undefined && { subject: p.subject }), ...(p.preheader !== undefined && { preheader: p.preheader }) }) }
     else set({ sequence: series.map((e, i) => (i === active - 1 ? { ...e, ...p } : e)) })
   }
+  function removeCurrent() {
+    if (active === 0 || !window.confirm(`Remove Email ${active + 1} from this series?`)) return
+    if (editing) setEditing(false)
+    set({ sequence: series.filter((_, i) => i !== active - 1) })
+    setActive(0)
+  }
   const tabs = series.length > 0 && (
     <div className="mb-4 flex flex-wrap gap-1.5" aria-label="Emails in this series">
       {[{ day: 1 }, ...series].map((e, i) => (
@@ -255,6 +261,7 @@ export default function CampaignEditor(props: {
             <div className="card p-5">
               <h2 className="text-xl">Email for {place}</h2>
               <div className="mt-3">{tabs}</div>
+              {active > 0 && <button type="button" onClick={removeCurrent} className="mb-3 text-sm font-semibold text-bad hover:underline">Remove this email from the series</button>}
               <input ref={file} type="file" accept=".pdf,.docx,.txt" className="sr-only" aria-label="Content file" onChange={(e) => e.target.files?.[0] && upload(e.target.files[0])} />
               <button type="button" disabled={reading} onClick={() => file.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)}
