@@ -214,6 +214,7 @@ export async function campaignStats(id?: number) {
     SUM(sent_at IS NOT NULL) sent,
     SUM(delivered_at IS NOT NULL) delivered,
     SUM(opened_at IS NOT NULL) opened,
+    SUM(clicked_at IS NOT NULL) clicked,
     SUM(replied_at IS NOT NULL) replied,
     SUM(bounced_at IS NOT NULL) bounced,
     SUM(complained_at IS NOT NULL) complained,
@@ -221,7 +222,7 @@ export async function campaignStats(id?: number) {
     SUM(status = 'skipped') skipped
     FROM sends ${id ? 'WHERE campaign_id = ?' : ''}`, id ? [id] : [])
   const n = (k: string) => Number(r?.[k] || 0)
-  return { total: n('total'), queued: n('queued'), sent: n('sent'), delivered: n('delivered'), opened: n('opened'), replied: n('replied'), bounced: n('bounced'), complained: n('complained'), failed: n('failed'), skipped: n('skipped') }
+  return { total: n('total'), queued: n('queued'), sent: n('sent'), delivered: n('delivered'), opened: n('opened'), clicked: n('clicked'), replied: n('replied'), bounced: n('bounced'), complained: n('complained'), failed: n('failed'), skipped: n('skipped') }
 }
 
 /** Back in the queue: everyone who failed for a passing reason, not bad addresses. */

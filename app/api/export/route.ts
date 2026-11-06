@@ -27,10 +27,10 @@ export const GET = route(async (req: Request) => {
     name = 'replies-for-sales.csv'
   } else if (q.get('type') === 'campaign' && q.get('id')) {
     const id = Number(q.get('id'))
-    const rows = await all(`SELECT ct.first_name, ct.last_name, s.email, ct.state, s.status, s.provider, s.sent_at, s.delivered_at, s.opened_at, s.replied_at, s.bounced_at, s.last_error
+    const rows = await all(`SELECT ct.first_name, ct.last_name, s.email, ct.state, s.status, s.provider, s.sent_at, s.delivered_at, s.opened_at, s.clicked_at, s.replied_at, s.bounced_at, s.last_error
       FROM sends s JOIN contacts ct ON ct.id = s.contact_id WHERE s.campaign_id = ? ORDER BY s.id`, [id])
-    text = csv(['First Name', 'Last Name', 'Email', 'State', 'Status', 'Sender', 'Sent', 'Delivered', 'Opened', 'Replied', 'Bounced', 'Error'],
-      rows.map((r) => [r.first_name, r.last_name, r.email, r.state, r.status, r.provider, iso(r.sent_at), iso(r.delivered_at), iso(r.opened_at), iso(r.replied_at), iso(r.bounced_at), r.last_error]))
+    text = csv(['First Name', 'Last Name', 'Email', 'State', 'Status', 'Sender', 'Sent', 'Delivered', 'Opened', 'Clicked', 'Replied', 'Bounced', 'Error'],
+      rows.map((r) => [r.first_name, r.last_name, r.email, r.state, r.status, r.provider, iso(r.sent_at), iso(r.delivered_at), iso(r.opened_at), iso(r.clicked_at), iso(r.replied_at), iso(r.bounced_at), r.last_error]))
     name = `campaign-${id}.csv`
   } else return fail('Unknown export')
   return new Response(`﻿${text}`, { headers: { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="${name}"` } })

@@ -2,14 +2,14 @@ import { safeEqual } from '@/lib/auth'
 import { fail, json, route } from '@/lib/api'
 import { one, run, setKv } from '@/lib/db'
 
-type Event = 'delivered' | 'opened' | 'bounced' | 'complained' | 'unsubscribed'
+type Event = 'delivered' | 'opened' | 'clicked' | 'bounced' | 'complained' | 'unsubscribed'
 
 const BREVO: Record<string, Event> = {
-  delivered: 'delivered', opened: 'opened', unique_opened: 'opened', proxy_open: 'opened',
+  delivered: 'delivered', opened: 'opened', unique_opened: 'opened', proxy_open: 'opened', click: 'clicked',
   hard_bounce: 'bounced', invalid_email: 'bounced', blocked: 'bounced', spam: 'complained', unsubscribed: 'unsubscribed',
 }
 const RESEND: Record<string, Event> = {
-  'email.delivered': 'delivered', 'email.opened': 'opened', 'email.bounced': 'bounced', 'email.complained': 'complained',
+  'email.delivered': 'delivered', 'email.opened': 'opened', 'email.clicked': 'clicked', 'email.bounced': 'bounced', 'email.complained': 'complained',
 }
 
 async function apply(provider: string, email: string, messageId: string | undefined, ev: Event) {
@@ -19,6 +19,7 @@ async function apply(provider: string, email: string, messageId: string | undefi
   if (!send) return
   if (ev === 'delivered') await run('UPDATE sends SET delivered_at = COALESCE(delivered_at, ?) WHERE id = ?', [now, send.id])
   if (ev === 'opened') await run('UPDATE sends SET opened_at = COALESCE(opened_at, ?) WHERE id = ?', [now, send.id])
+  if (ev === 'clicked') await run('UPDATE sends SET clicked_at = COALESCE(clicked_at, ?), opened_at = COALESCE(opened_at, ?) WHERE id = ?', [now, now, send.id])
   if (ev === 'bounced') {
     await run('UPDATE sends SET bounced_at = COALESCE(bounced_at, ?) WHERE id = ?', [now, send.id])
     await run("UPDATE contacts SET status = 'bounced' WHERE id = ? AND status = 'active'", [send.contact_id])

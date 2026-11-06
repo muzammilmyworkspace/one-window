@@ -71,8 +71,8 @@ export default async function SettingsPage() {
         <p className="mt-0.5 text-[13px] text-ink-2">{isPublic ? 'Paste these into the services below. Keep them private.' : 'These work once the tool is on Vercel. On localhost, sending runs while this tab is open.'}</p>
         <div className="mt-4 grid gap-4">
           <CopyField label="Scheduler: call every minute (cron-job.org), keeps sending with the tab closed" value={`${app}/api/cron?token=${secret}`} />
-          <CopyField label="Brevo webhook: Delivered, Opened, Hard bounce, Spam, Unsubscribed" value={`${app}/api/webhooks/brevo?token=${secret}`} />
-          <CopyField label="Resend webhook: email.delivered, email.opened, email.bounced, email.complained" value={`${app}/api/webhooks/resend?token=${secret}`} />
+          <CopyField label="Brevo webhook: Delivered, Opened, Clicked, Hard bounce, Spam, Unsubscribed" value={`${app}/api/webhooks/brevo?token=${secret}`} />
+          <CopyField label="Resend webhook: email.delivered, email.opened, email.clicked, email.bounced, email.complained" value={`${app}/api/webhooks/resend?token=${secret}`} />
         </div>
       </section>
 

@@ -68,8 +68,10 @@ export default async function CampaignPage({ params, searchParams }: { params: P
         <Meter value={stats.sent} max={stats.total} label="Campaign progress" />
       </section>
 
-      <section aria-label="Totals" className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <section aria-label="Totals" className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Stat label="Replies" value={stats.replied} sub={`${pct(stats.replied, stats.sent)} of sent`} />
+        <Stat label="Opened" value={stats.opened} sub={`${pct(stats.opened, stats.sent)} of sent`} />
+        <Stat label="Clicked" value={stats.clicked} sub={`${pct(stats.clicked, stats.sent)} of sent`} />
         <Stat label="Waiting to send" value={stats.queued} />
         <Stat label="Bounced" value={stats.bounced} sub={pct(stats.bounced, stats.sent)} />
         <Stat label="Failed or skipped" value={stats.failed + stats.skipped} />

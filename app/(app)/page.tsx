@@ -61,11 +61,12 @@ export default async function Dashboard() {
       </section>
 
       <h2 className="mb-3 text-base">Results</h2>
-      <section aria-label="Totals" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <section aria-label="Totals" className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-7">
         <Stat label="Sent" value={stats.sent} sub="Emails sent so far" />
         <Stat label="Replies" value={stats.replied} sub={`${pct(stats.replied, stats.sent)} of sent`} />
         <Stat label="Delivered" value={seen ? stats.delivered : '–'} sub={none || `${pct(stats.delivered, stats.sent)} of sent`} />
         <Stat label="Opened" value={seen ? stats.opened : '–'} sub={none || `${pct(stats.opened, stats.sent)} of sent`} />
+        <Stat label="Clicked" value={seen ? stats.clicked : '–'} sub={none || `${pct(stats.clicked, stats.sent)} of sent`} />
         <Stat label="Bounced" value={count('bounced')} sub="Removed from future sends" />
         <Stat label="Unsubscribed" value={count('unsubscribed')} sub="Removed from future sends" />
       </section>
