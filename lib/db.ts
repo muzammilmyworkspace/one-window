@@ -67,6 +67,9 @@ CREATE TABLE IF NOT EXISTS replies (
   received_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS replies_time ON replies(received_at);
+CREATE INDEX IF NOT EXISTS replies_contact ON replies(contact_id, kind);
+CREATE INDEX IF NOT EXISTS sends_contact ON sends(contact_id);
+CREATE INDEX IF NOT EXISTS sends_sent ON sends(sent_at);
 
 CREATE TABLE IF NOT EXISTS providers (
   name TEXT PRIMARY KEY,

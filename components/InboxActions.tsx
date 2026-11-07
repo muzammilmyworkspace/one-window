@@ -26,12 +26,12 @@ export function SyncButton({ disabled }: { disabled: boolean }) {
   )
 }
 
-export function MarkUnread({ id }: { id: number }) {
+export function MarkUnread({ id, back = '/inbox' }: { id: number; back?: string }) {
   const router = useRouter()
   async function mark() {
     await fetch(`/api/inbox/${id}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ is_read: false }) })
-    router.push('/inbox')
+    router.push(back)
     router.refresh()
   }
-  return <button type="button" onClick={mark} className="btn btn-ghost">Mark unread</button>
+  return <button type="button" onClick={mark} className="btn btn-ghost !px-3 !py-1.5 !text-[13px]">Mark unread</button>
 }

@@ -1,42 +1,49 @@
 import Link from 'next/link'
 import { MarkUnread, SyncButton } from '@/components/InboxActions'
-import ReplyBox from '@/components/ReplyBox'
-import { Empty, Icon, Notice, PageHead, StatusBadge, when } from '@/components/ui'
-import { all, getKv, one, run } from '@/lib/db'
+import { Composer, EmailFrame } from '@/components/Mail'
+import { Badge, Empty, Icon, Notice, PageHead, StatusBadge, when } from '@/components/ui'
+import { getKv } from '@/lib/db'
 import { imapConfigured } from '@/lib/inbox'
+import { FOLDERS, folderCounts, fullName, listSent, listThreads, thread, type FolderKey, type Message } from '@/lib/mailbox'
+import { stateName } from '@/lib/lists'
 import { getSettings } from '@/lib/settings'
 
-const TABS = [['reply', 'Replies'], ['unsubscribe', 'Unsubscribes'], ['auto', 'Auto-replies'], ['bounce', 'Bounces']] as const
+const TZ = process.env.APP_TIMEZONE || 'Asia/Karachi'
+const stamp = (ms: number) => new Date(ms).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: TZ })
+const initials = (s: string) => s.replace(/[<>"]/g, '').split(/[\s@._-]+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join('') || '?'
+const snippet = (s: string, n = 120) => s.replace(/\s+/g, ' ').trim().slice(0, n)
 
-/** Splits what the person wrote from the quoted email under it. */
-function splitQuote(body: string): [string, string] {
-  const m = body.search(/^(On .+wrote:|>|-{2,} ?Original Message|From: .+)/m)
-  return m > 0 ? [body.slice(0, m).trim(), body.slice(m).trim()] : [body.trim(), '']
-}
+type Search = { f?: string; c?: string; q?: string; p?: string }
 
-export default async function Inbox({ searchParams }: { searchParams: Promise<{ tab?: string; id?: string }> }) {
+export default async function Inbox({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams
-  const tab = TABS.some(([k]) => k === sp.tab) ? sp.tab! : 'reply'
-  const id = Number(sp.id) || 0
+  const folder = FOLDERS.find((x) => x.key === sp.f) || FOLDERS[0]
+  const q = String(sp.q || '').trim().slice(0, 100)
+  const page = Math.max(1, Number(sp.p) || 1)
+  const open = Number(sp.c) || 0
+  const settings = await getSettings()
 
-  const open = id ? await one(`SELECT r.*, c.name campaign, ct.first_name, ct.last_name, ct.state, ct.status contact_status
-    FROM replies r LEFT JOIN campaigns c ON c.id = r.campaign_id LEFT JOIN contacts ct ON ct.id = r.contact_id WHERE r.id = ?`, [id]) : undefined
-  if (open && !open.is_read) await run('UPDATE replies SET is_read = 1 WHERE id = ?', [id])
-
-  const activeTab = open ? String(open.kind) : tab
-  const [rows, counts, synced, error, settings] = await Promise.all([
-    all('SELECT id, from_name, from_email, subject, body, kind, is_read, received_at FROM replies WHERE kind = ? ORDER BY received_at DESC LIMIT 100', [activeTab]),
-    all('SELECT kind, COUNT(*) n FROM replies GROUP BY kind'),
-    getKv('inbox_synced'), getKv('inbox_error'), getSettings(),
+  const t = open ? await thread(open, settings) : null   // opening marks it read, so counts come after
+  const [counts, list, synced, error] = await Promise.all([
+    folderCounts(),
+    folder.key === 'sent' ? listSent(q, page) : listThreads(folder.kind!, q).then((rows) => ({ rows, more: false })),
+    getKv('inbox_synced'), getKv('inbox_error'),
   ])
-  const answers = open ? await all('SELECT * FROM answers WHERE reply_id = ? ORDER BY sent_at', [Number(open.id)]) : []
-  const count = (k: string) => Number(counts.find((c) => c.kind === k)?.n || 0)
   const connected = imapConfigured()
-  const [said, quoted] = open ? splitQuote(String(open.body)) : ['', '']
+
+  const href = (o: { f?: FolderKey; c?: number; q?: string; p?: number }) => {
+    const u = new URLSearchParams()
+    u.set('f', o.f || folder.key)
+    if (o.q ?? q) u.set('q', o.q ?? q)
+    if (o.p && o.p > 1) u.set('p', String(o.p))
+    if (o.c) u.set('c', String(o.c))
+    return `/inbox?${u}`
+  }
+  const listHref = href({ p: page })
 
   return (
     <>
-      <PageHead title="Inbox" sub={<>Replies from people you emailed. Every one is also in {settings.reply_to}{synced ? `. Checked ${when(Number(synced))}` : ''}.</>}>
+      <PageHead title="Inbox" sub={<>Every conversation with the people you emailed, also in {settings.reply_to}{synced ? `. Checked ${when(Number(synced))}` : ''}.</>}>
         <a href="/api/export?type=replied" className="btn btn-ghost"><Icon name="download" size={15} /> Export for sales</a>
         <SyncButton disabled={!connected} />
       </PageHead>
@@ -44,72 +51,179 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<{ 
       {!connected && <Notice tone="warn">The info@ inbox is not connected yet. Add its password as IMAP_PASS, then replies appear here.</Notice>}
       {connected && error && <Notice tone="bad">Could not read the inbox: {error}</Notice>}
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-        <section className="card min-w-0 self-start overflow-hidden">
-          <nav aria-label="Reply types" className="flex gap-1 overflow-x-auto border-b border-line p-2">
-            {TABS.map(([k, label]) => (
-              <Link key={k} href={`/inbox?tab=${k}`} aria-current={activeTab === k ? 'true' : undefined} className={`flex-none rounded-lg px-2.5 py-1.5 text-[13px] font-bold ${activeTab === k ? 'bg-brand-soft text-brand-dark' : 'text-ink-2 hover:bg-page'}`}>
-                {label} <span className="font-semibold opacity-70">{count(k)}</span>
+      <div className="card overflow-hidden lg:grid lg:h-[calc(100vh-200px)] lg:min-h-[560px] lg:grid-cols-[190px_330px_minmax(0,1fr)]">
+        {/* folders */}
+        <nav aria-label="Folders" className={`${t ? 'hidden lg:flex' : 'flex'} gap-1 overflow-x-auto border-b border-line bg-page/50 p-2 lg:flex-col lg:overflow-visible lg:border-b-0 lg:border-r lg:p-3`}>
+          {FOLDERS.map((x) => {
+            const on = x.key === folder.key, n = counts[x.key]
+            return (
+              <Link key={x.key} href={`/inbox?f=${x.key}`} aria-current={on ? 'page' : undefined}
+                className={`flex flex-none items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-semibold ${on ? 'bg-white text-brand-dark shadow-card' : 'text-ink-2 hover:bg-white/70 hover:text-ink'}`}>
+                <Icon name={x.icon} size={16} />
+                <span>{x.label}</span>
+                {n.unread > 0
+                  ? <span className="ml-auto rounded-full bg-sun px-1.5 text-xs font-extrabold text-deep" aria-label={`${n.unread} unread`}>{n.unread}</span>
+                  : <span className="ml-auto text-xs font-semibold text-ink-3">{n.total || ''}</span>}
               </Link>
-            ))}
-          </nav>
-          {rows.length === 0 ? <Empty icon="inbox" title="Nothing here yet" /> : (
-            <ul className="max-h-[640px] overflow-y-auto">
-              {rows.map((r) => (
-                <li key={r.id} className="border-b border-line last:border-0">
-                  <Link href={`/inbox?id=${r.id}`} aria-current={id === Number(r.id) ? 'true' : undefined} className={`block px-4 py-3 ${id === Number(r.id) ? 'bg-brand-soft' : 'hover:bg-page'}`}>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className={`min-w-0 truncate text-sm ${r.is_read || id === Number(r.id) ? 'font-semibold' : 'font-extrabold'}`}>
-                        {!r.is_read && id !== Number(r.id) && <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-sun align-middle" aria-label="Unread" />}
-                        {r.from_name || r.from_email}
-                      </p>
-                      <span className="flex-none text-xs text-ink-3">{when(r.received_at)}</span>
-                    </div>
-                    <p className="mt-0.5 truncate text-[13px] text-ink-2">{String(r.body).trim().slice(0, 110) || r.subject}</p>
-                  </Link>
-                </li>
-              ))}
+            )
+          })}
+          <a href={settings.webmail_url} target="_blank" rel="noopener noreferrer" className="mt-auto hidden items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-ink-3 hover:text-ink lg:flex">
+            <Icon name="link" size={14} /> info@ webmail
+          </a>
+        </nav>
+
+        {/* message list */}
+        <section aria-label={folder.label} className={`${t ? 'hidden lg:flex' : 'flex'} min-h-0 min-w-0 flex-col border-line lg:border-r`}>
+          <form action="/inbox" className="border-b border-line p-2.5">
+            <input type="hidden" name="f" value={folder.key} />
+            <label className="relative block">
+              <span className="sr-only">Search {folder.label}</span>
+              <Icon name="search" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+              <input name="q" defaultValue={q} placeholder={`Search ${folder.label.toLowerCase()}`} className="field !py-2 !pl-9 !text-[13px]" />
+            </label>
+          </form>
+          {list.rows.length === 0 ? (
+            <Empty icon={folder.icon} title={q ? 'No matches' : 'Nothing here yet'}>
+              {q ? <Link href={`/inbox?f=${folder.key}`} className="font-semibold text-brand-dark underline">Clear the search</Link>
+                : folder.key === 'inbox' ? 'Replies from people you emailed show up here.' : null}
+            </Empty>
+          ) : (
+            <ul className="min-h-0 flex-1 overflow-y-auto">
+              {list.rows.map((r) => {
+                const on = Number(r.contact_id) === open
+                const unread = folder.key !== 'sent' && Number(r.unread) > 0 && !on
+                const who = fullName(r) || r.from_name || r.email || r.from_email
+                const at = Number(folder.key === 'sent' ? r.at : r.last)
+                return (
+                  <li key={folder.key === 'sent' ? `${r.type}${r.id}` : r.contact_id} className="border-b border-line">
+                    <Link href={href({ c: Number(r.contact_id), p: page })} aria-current={on ? 'true' : undefined}
+                      className={`block border-l-[3px] px-3.5 py-3 ${on ? 'border-brand bg-brand-soft/70' : unread ? 'border-sun hover:bg-page' : 'border-transparent hover:bg-page'}`}>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className={`min-w-0 truncate text-sm ${unread ? 'font-extrabold' : 'font-semibold'}`}>
+                          {folder.key === 'sent' && <span className="font-normal text-ink-3">To: </span>}{who}
+                          {folder.key !== 'sent' && Number(r.total) > 1 && <span className="ml-1.5 text-xs font-semibold text-ink-3">{Number(r.total)}</span>}
+                        </p>
+                        <time className={`flex-none text-xs ${unread ? 'font-bold text-ink' : 'text-ink-3'}`}>{when(at)}</time>
+                      </div>
+                      <p className={`mt-0.5 truncate text-[13px] ${unread ? 'font-bold text-ink' : 'text-ink'}`}>{String(r.subject) || '(no subject)'}</p>
+                      {folder.key === 'sent' ? (
+                        <p className="mt-1 flex items-center gap-2 truncate text-xs text-ink-3">
+                          <span className="truncate">{r.type === 'answer' ? 'Your reply' : r.label}</span>
+                          {r.bounced_at ? <span className="font-semibold text-bad">Bounced</span>
+                            : r.replied_at ? <span className="font-semibold text-good">Replied</span>
+                            : r.clicked_at ? <span className="font-semibold text-blue">Clicked</span>
+                            : r.opened_at ? <span className="font-semibold text-ink-2">Opened</span> : null}
+                        </p>
+                      ) : (
+                        <p className="mt-0.5 truncate text-[13px] text-ink-2">{snippet(String(r.body)) || ' '}</p>
+                      )}
+                    </Link>
+                  </li>
+                )
+              })}
             </ul>
+          )}
+          {folder.key === 'sent' && (page > 1 || list.more) && (
+            <div className="flex items-center justify-between border-t border-line px-3 py-2 text-[13px] font-semibold">
+              {page > 1 ? <Link href={href({ p: page - 1 })} className="text-brand-dark">← Newer</Link> : <span />}
+              <span className="text-ink-3">Page {page}</span>
+              {list.more ? <Link href={href({ p: page + 1 })} className="text-brand-dark">Older →</Link> : <span />}
+            </div>
           )}
         </section>
 
-        <section className="card min-w-0 self-start">
-          {!open ? <Empty icon="reply" title="Choose a message">It opens here. Nothing changes in the info@ mailbox.</Empty> : (
-            <>
-              <div className="border-b border-line p-5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <StatusBadge status={String(open.kind)} />
-                  {open.contact_status && open.contact_status !== 'active' && <StatusBadge status={String(open.contact_status)} />}
+        {/* conversation */}
+        <section aria-label="Conversation" className={`${t ? 'flex' : 'hidden lg:flex'} min-h-0 min-w-0 flex-col`}>
+          {!t ? (
+            <div className="m-auto"><Empty icon="reply" title={open ? 'Conversation not found' : 'Choose a conversation'}>The whole back and forth opens here: your emails, their replies and your answers.</Empty></div>
+          ) : (
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <header className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-3.5 backdrop-blur sm:px-6">
+                <Link href={listHref} className="mb-2 inline-flex items-center gap-1 text-[13px] font-semibold text-brand-dark lg:hidden"><Icon name="back" size={15} /> {folder.label}</Link>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="break-words text-lg leading-snug">{t.subject}</h2>
+                    <p className="mt-1 break-all text-[13px] text-ink-2"><b className="text-ink">{t.name}</b> &lt;{t.email}&gt;</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {t.contact?.status && <StatusBadge status={String(t.contact.status)} />}
+                      {t.contact?.state && <Badge tone="mute">{stateName(String(t.contact.state))}</Badge>}
+                      {t.contact?.company && <Badge tone="mute">{String(t.contact.company)}</Badge>}
+                      {t.campaigns.map((c) => <Badge key={c} tone="info">{c}</Badge>)}
+                    </div>
+                  </div>
+                  {t.latestReplyId > 0 && <MarkUnread id={t.latestReplyId} back={listHref} />}
                 </div>
-                <h2 className="mt-2 break-words text-lg">{String(open.subject) || '(no subject)'}</h2>
-                <p className="mt-1 break-all text-sm text-ink-2"><b className="text-ink">{open.from_name || `${open.first_name || ''} ${open.last_name || ''}`.trim()}</b> {`<${open.from_email}>`}</p>
-                <p className="mt-0.5 text-[13px] text-ink-3">
-                  {new Date(Number(open.received_at)).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
-                  {open.state ? ` · ${open.state}` : ''}{open.campaign ? ` · ${open.campaign}` : ''}
-                </p>
+              </header>
+
+              <ol className="space-y-3 px-3 py-4 sm:px-6">
+                {t.messages.map((m, i) => <MessageCard key={m.key} m={m} last={i === t.messages.length - 1} />)}
+              </ol>
+
+              <div className="px-3 pb-6 sm:px-6">
+                {t.replyTo ? (
+                  <>
+                    {t.contact?.status === 'unsubscribed' && <Notice tone="warn">This person asked not to get emails. Only reply if they asked you something.</Notice>}
+                    <Composer replyId={t.replyTo.id} toName={t.name} toEmail={t.email} subject={t.replyTo.subject} draftKey={String(open)} />
+                  </>
+                ) : (
+                  <p className="rounded-xl bg-page px-4 py-3 text-sm text-ink-2">{t.name} has not written back yet. You can reply here as soon as they do.</p>
+                )}
               </div>
-              <div className="whitespace-pre-wrap break-words p-5 text-[15px] leading-relaxed">{said || '(empty message)'}</div>
-              {quoted && (
-                <details className="mx-5 mb-5 rounded-lg bg-page px-4 py-3 text-sm text-ink-2">
-                  <summary className="cursor-pointer font-semibold">Show the earlier email</summary>
-                  <div className="mt-2 whitespace-pre-wrap break-words">{quoted}</div>
-                </details>
-              )}
-              {answers.map((a) => (
-                <div key={a.id} className="mx-5 mb-4 rounded-lg bg-brand-soft px-4 py-3">
-                  <p className="text-[13px] font-semibold text-brand-dark">You replied · {when(a.sent_at)}</p>
-                  <div className="mt-1 whitespace-pre-wrap break-words text-sm">{a.body}</div>
-                </div>
-              ))}
-              <ReplyBox id={Number(open.id)} to={String(open.from_email)} />
-              <div className="flex flex-wrap items-center gap-2 border-t border-line p-4">
-                <a href={settings.webmail_url} target="_blank" rel="noopener noreferrer" className="btn btn-ghost"><Icon name="link" size={15} /> Open info@ webmail</a>
-                <MarkUnread id={Number(open.id)} />
-              </div>
-            </>
+            </div>
           )}
         </section>
       </div>
     </>
+  )
+}
+
+function MessageCard({ m, last }: { m: Message; last: boolean }) {
+  const out = m.dir === 'out'
+  const label = m.type === 'campaign' ? 'Campaign email' : m.type === 'answer' ? 'Your reply' : ''
+  return (
+    <li>
+      <details open={last || m.type !== 'campaign'} className={`group overflow-hidden rounded-xl border ${out ? 'border-line bg-white' : 'border-[#d6dcf5] bg-[#fbfcff]'}`}>
+        <summary className="flex cursor-pointer list-none items-start gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
+          <span aria-hidden="true" className={`flex h-9 w-9 flex-none items-center justify-center rounded-full text-[13px] font-extrabold ${out ? 'bg-deep text-white' : 'bg-brand-soft text-brand-dark'}`}>{initials(m.fromName || m.fromEmail)}</span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-baseline justify-between gap-2">
+              <span className="min-w-0 truncate text-sm font-bold">{out ? 'You' : m.fromName}{out && <span className="font-normal text-ink-3"> ({m.fromName})</span>}</span>
+              <time className="flex-none text-xs text-ink-3">{stamp(m.at)}</time>
+            </span>
+            <span className="block truncate text-xs text-ink-3">
+              {out ? `to ${m.to}` : `${m.fromEmail}`}{label ? ` · ${label}` : ''}
+            </span>
+            <span className="mt-1 block truncate text-[13px] text-ink-2 group-open:hidden">{m.type === 'campaign' ? m.subject : snippet(m.text, 140)}</span>
+          </span>
+        </summary>
+        <div className="px-4 pb-4 sm:pl-16">
+          {m.kind && m.kind !== 'reply' && <div className="mb-2"><StatusBadge status={m.kind} /></div>}
+          {m.type === 'campaign' ? (
+            <>
+              <div className="mb-2 flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="font-semibold text-ink-2">{m.subject}</span>
+                {m.campaign && <Badge tone="mute">{m.campaign}</Badge>}
+                {m.stats?.bounced ? <Badge tone="bad" icon="alert">Bounced</Badge> : <>
+                  {m.stats?.delivered && <Badge tone="good" icon="check">Delivered</Badge>}
+                  {m.stats?.opened && <Badge tone="info" icon="eye">Opened</Badge>}
+                  {m.stats?.clicked && <Badge tone="info" icon="link">Clicked</Badge>}
+                </>}
+              </div>
+              <EmailFrame html={m.html!} title={`Email: ${m.subject}`} />
+            </>
+          ) : (
+            <>
+              <div className="whitespace-pre-wrap break-words text-[15px] leading-relaxed">{m.text || '(empty message)'}</div>
+              {m.quoted && (
+                <details className="mt-3 text-sm text-ink-2">
+                  <summary className="inline-flex cursor-pointer list-none rounded-md bg-page px-2 py-0.5 font-bold tracking-widest text-ink-3 [&::-webkit-details-marker]:hidden" aria-label="Show quoted text">•••</summary>
+                  <div className="mt-2 whitespace-pre-wrap break-words border-l-2 border-line pl-3">{m.quoted}</div>
+                </details>
+              )}
+            </>
+          )}
+        </div>
+      </details>
+    </li>
   )
 }

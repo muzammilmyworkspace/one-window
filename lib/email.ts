@@ -12,6 +12,9 @@ function fill(str: string, c: Person, html: boolean): string {
   return str.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k) => (k in vals ? (html ? esc(vals[k]) : vals[k]) : m))
 }
 
+/** Fills {{first_name}} and the other fields into plain text, such as a subject line. */
+export const personalize = (str: string, c: Person) => fill(str, c, false)
+
 export function toText(html: string): string {
   return html
     .replace(/<head[\s\S]*?<\/head>/i, '')

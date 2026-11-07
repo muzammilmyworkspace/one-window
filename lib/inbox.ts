@@ -1,6 +1,7 @@
 import { ImapFlow } from 'imapflow'
 import { simpleParser, type ParsedMail } from 'mailparser'
 import { batch, getKv, lease, one, release, run, setKv } from './db'
+import { getSettings } from './settings'
 
 export const imapConfigured = () => !!(process.env.IMAP_USER && process.env.IMAP_PASS)
 const MAX_PER_SYNC = 40
@@ -29,6 +30,9 @@ export async function ingest(parsed: ParsedMail, fallbackId: string): Promise<bo
   const addr = parsed.from?.value?.[0]
   const from = (addr?.address || '').toLowerCase()
   if (!from) return false
+  // the copy of your own reply that lands back in info@ is not a new message from the person
+  const s = await getSettings()
+  if (from === s.from_email.toLowerCase() || from === s.reply_to.toLowerCase()) return false
   const subject = parsed.subject || ''
   const text = (parsed.text || '').slice(0, 20000)
   const messageId = parsed.messageId || fallbackId
