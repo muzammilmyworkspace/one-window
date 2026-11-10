@@ -4,7 +4,7 @@ import { Composer, EmailFrame } from '@/components/Mail'
 import { Badge, Empty, Icon, Notice, PageHead, StatusBadge, when } from '@/components/ui'
 import { getKv } from '@/lib/db'
 import { imapConfigured } from '@/lib/inbox'
-import { FOLDERS, folderCounts, fullName, listSent, listThreads, thread, type FolderKey, type Message } from '@/lib/mailbox'
+import { FOLDERS, folderCounts, fullName, listBounces, listSent, listThreads, thread, type FolderKey, type Message } from '@/lib/mailbox'
 import { stateName } from '@/lib/lists'
 import { getSettings } from '@/lib/settings'
 
@@ -26,7 +26,9 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<Se
   const t = open ? await thread(open, settings) : null   // opening marks it read, so counts come after
   const [counts, list, synced, error] = await Promise.all([
     folderCounts(),
-    folder.key === 'sent' ? listSent(q, page) : listThreads(folder.kind!, q).then((rows) => ({ rows, more: false })),
+    folder.key === 'sent' ? listSent(q, page)
+      : folder.key === 'bounce' ? listBounces(q).then((rows) => ({ rows, more: false }))
+      : listThreads(folder.kind!, q).then((rows) => ({ rows, more: false })),
     getKv('inbox_synced'), getKv('inbox_error'),
   ])
   const connected = imapConfigured()
@@ -85,7 +87,8 @@ export default async function Inbox({ searchParams }: { searchParams: Promise<Se
           {list.rows.length === 0 ? (
             <Empty icon={folder.icon} title={q ? 'No matches' : 'Nothing here yet'}>
               {q ? <Link href={`/inbox?f=${folder.key}`} className="font-semibold text-brand-dark underline">Clear the search</Link>
-                : folder.key === 'inbox' ? 'Replies from people you emailed show up here.' : null}
+                : folder.key === 'inbox' ? 'Replies from people you emailed show up here.'
+                : folder.key === 'bounce' ? 'Addresses that could not get your email show up here, with the reason.' : null}
             </Empty>
           ) : (
             <ul className="min-h-0 flex-1 overflow-y-auto">
@@ -209,6 +212,7 @@ function MessageCard({ m, last }: { m: Message; last: boolean }) {
                   {m.stats?.clicked && <Badge tone="info" icon="link">Clicked</Badge>}
                 </>}
               </div>
+              {m.note && <p className="mb-2 rounded-lg bg-bad-soft px-3 py-2 text-[13px] font-semibold text-bad">{m.note}. This address gets no more emails.</p>}
               <EmailFrame html={m.html!} title={`Email: ${m.subject}`} />
             </>
           ) : (

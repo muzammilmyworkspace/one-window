@@ -12,7 +12,7 @@ const RESEND: Record<string, Event> = {
   'email.delivered': 'delivered', 'email.opened': 'opened', 'email.clicked': 'clicked', 'email.bounced': 'bounced', 'email.complained': 'complained',
 }
 
-async function apply(provider: string, email: string, messageId: string | undefined, ev: Event) {
+async function apply(provider: string, email: string, messageId: string | undefined, ev: Event, reason = '') {
   const now = Date.now()
   const send = (messageId ? await one('SELECT id, contact_id FROM sends WHERE message_id = ?', [messageId]) : undefined)
     || await one('SELECT id, contact_id FROM sends WHERE email = ? AND provider = ? AND sent_at IS NOT NULL ORDER BY sent_at DESC LIMIT 1', [email.toLowerCase(), provider])
@@ -21,7 +21,8 @@ async function apply(provider: string, email: string, messageId: string | undefi
   if (ev === 'opened') await run('UPDATE sends SET opened_at = COALESCE(opened_at, ?) WHERE id = ?', [now, send.id])
   if (ev === 'clicked') await run('UPDATE sends SET clicked_at = COALESCE(clicked_at, ?), opened_at = COALESCE(opened_at, ?) WHERE id = ?', [now, now, send.id])
   if (ev === 'bounced') {
-    await run('UPDATE sends SET bounced_at = COALESCE(bounced_at, ?) WHERE id = ?', [now, send.id])
+    // keep why it bounced, so the Bounces folder can say it
+    await run('UPDATE sends SET bounced_at = COALESCE(bounced_at, ?), last_error = COALESCE(last_error, ?) WHERE id = ?', [now, reason.slice(0, 300) || null, send.id])
     await run("UPDATE contacts SET status = 'bounced' WHERE id = ? AND status = 'active'", [send.contact_id])
   }
   if (ev === 'complained') await run('UPDATE sends SET complained_at = COALESCE(complained_at, ?) WHERE id = ?', [now, send.id])
@@ -37,12 +38,15 @@ export const POST = route(async (req: Request, ctx: { params: Promise<{ provider
   if (provider === 'brevo') {
     for (const e of Array.isArray(body) ? body : [body]) {
       const ev = BREVO[e.event]
-      if (ev && e.email) await apply('brevo', e.email, e['message-id'], ev)
+      const why = ev === 'bounced' ? `Brevo: ${String(e.event).replace(/_/g, ' ')}${e.reason ? ` · ${e.reason}` : ''}` : ''
+      if (ev && e.email) await apply('brevo', e.email, e['message-id'], ev, why)
     }
   } else if (provider === 'resend') {
     const ev = RESEND[body.type]
     const to = body.data?.to?.[0]
-    if (ev && to) await apply('resend', to, undefined, ev)
+    const b = body.data?.bounce
+    const why = ev === 'bounced' ? `Resend: bounced${b?.message ? ` · ${b.message}` : b?.subType ? ` · ${b.subType}` : ''}` : ''
+    if (ev && to) await apply('resend', to, undefined, ev, why)
   } else return fail('Unknown provider', 404)
   return json({ ok: true })
 })

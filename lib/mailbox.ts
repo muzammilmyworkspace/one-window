@@ -23,15 +23,19 @@ export function splitQuote(body: string): [string, string] {
 }
 
 export async function folderCounts(): Promise<Record<FolderKey, { total: number; unread: number }>> {
-  const [kinds, sent] = await Promise.all([
+  const [kinds, sent, bounces] = await Promise.all([
     all('SELECT kind, COUNT(DISTINCT contact_id) n, COUNT(DISTINCT CASE WHEN is_read = 0 THEN contact_id END) unread FROM replies GROUP BY kind'),
     one('SELECT (SELECT COUNT(*) FROM sends WHERE sent_at IS NOT NULL) + (SELECT COUNT(*) FROM answers) n'),
+    one(`SELECT COUNT(DISTINCT contact_id) n FROM (SELECT contact_id FROM sends WHERE bounced_at IS NOT NULL
+      UNION ALL SELECT contact_id FROM replies WHERE kind = 'bounce' AND contact_id IS NOT NULL)`),
   ])
   const out = { sent: { total: Number(sent?.n || 0), unread: 0 } } as Record<FolderKey, { total: number; unread: number }>
   for (const f of FOLDERS) if (f.kind) {
     const k = kinds.find((r) => r.kind === f.kind)
     out[f.key] = { total: Number(k?.n || 0), unread: Number(k?.unread || 0) }
   }
+  out.bounce.total = Number(bounces?.n || 0)
+  out.bounce.unread = 0   // bounces are not messages to read: always show the total, the same number as the dashboard
   return out
 }
 
@@ -49,6 +53,39 @@ export async function listThreads(kind: string, q: string) {
     WHERE ? = '' OR r.from_email LIKE ? ESCAPE '\\' OR r.from_name LIKE ? ESCAPE '\\' OR r.subject LIKE ? ESCAPE '\\' OR r.body LIKE ? ESCAPE '\\'
       OR (ct.first_name || ' ' || ct.last_name) LIKE ? ESCAPE '\\'
     ORDER BY t.last DESC LIMIT 200`, [kind, kind, q, like(q), like(q), like(q), like(q), like(q)])
+}
+
+/**
+ * Every address that bounced, from all three places a bounce can come from:
+ * Brevo or Resend reporting it, the address being refused while sending, or a
+ * "delivery failed" email landing in info@. One row per person, newest first.
+ */
+export async function listBounces(q: string) {
+  const rows = await all(`SELECT b.contact_id, MAX(b.at) last, SUM(b.unread) unread, b.reason, b.subject, b.src,
+      ct.first_name, ct.last_name, ct.email, ct.state, ct.company, ct.status
+    FROM (
+      SELECT s.contact_id, s.bounced_at at, 0 unread, COALESCE(s.last_error, '') reason, c.subject, COALESCE(s.provider, '') src
+      FROM sends s JOIN campaigns c ON c.id = s.campaign_id WHERE s.bounced_at IS NOT NULL
+      UNION ALL
+      SELECT r.contact_id, r.received_at, r.is_read = 0, r.body, r.subject, 'mail'
+      FROM replies r WHERE r.kind = 'bounce' AND r.contact_id IS NOT NULL) b
+    LEFT JOIN contacts ct ON ct.id = b.contact_id
+    WHERE ? = '' OR ct.email LIKE ? ESCAPE '\\' OR (ct.first_name || ' ' || ct.last_name) LIKE ? ESCAPE '\\' OR b.reason LIKE ? ESCAPE '\\'
+    GROUP BY b.contact_id ORDER BY last DESC LIMIT 200`, [q, like(q), like(q), like(q)])
+  // SQLite takes the bare columns (reason, subject, src) from the row with the newest bounce
+  return rows.map((r): Row => ({
+    ...r,
+    subject: r.src === 'mail' ? String(r.subject) : personalize(String(r.subject), { email: String(r.email), first_name: r.first_name, last_name: r.last_name, state: r.state, company: r.company }),
+    body: bounceReason(String(r.reason), String(r.src)),
+  }))
+}
+
+/** A short, readable reason for a bounce. */
+export function bounceReason(reason: string, src: string): string {
+  const text = reason.replace(/\s+/g, ' ').trim()
+  if (src === 'mail') return `Delivery failed notice in info@: ${text.slice(0, 160)}`
+  if (!text) return `Reported as bounced by ${src === 'resend' ? 'Resend' : 'Brevo'}`
+  return /^(brevo|resend):/i.test(text) ? text : `Refused while sending: ${text}`
 }
 
 /** Everything that went out: campaign emails and your own replies, newest first. */
@@ -89,14 +126,15 @@ export interface Message {
   kind?: string         // reply | auto | unsubscribe | bounce
   campaign?: string
   stats?: { delivered?: number; opened?: number; clicked?: number; bounced?: number }
+  note?: string         // why it bounced
 }
 
 /** The whole conversation with one person, oldest first. */
 export async function thread(contactId: number, s: Settings) {
   const [contact, sends, replies, answers] = await Promise.all([
     one('SELECT * FROM contacts WHERE id = ?', [contactId]),
-    all(`SELECT s.id, s.email, s.sent_at, s.delivered_at, s.opened_at, s.clicked_at, s.bounced_at, c.subject, c.html, c.preheader, c.reason, c.name campaign
-      FROM sends s JOIN campaigns c ON c.id = s.campaign_id WHERE s.contact_id = ? AND s.sent_at IS NOT NULL`, [contactId]),
+    all(`SELECT s.id, s.email, s.provider, s.sent_at, s.delivered_at, s.opened_at, s.clicked_at, s.bounced_at, s.last_error, c.subject, c.html, c.preheader, c.reason, c.name campaign
+      FROM sends s JOIN campaigns c ON c.id = s.campaign_id WHERE s.contact_id = ? AND (s.sent_at IS NOT NULL OR s.bounced_at IS NOT NULL)`, [contactId]),
     all('SELECT * FROM replies WHERE contact_id = ?', [contactId]),
     all('SELECT a.*, r.subject, r.from_email FROM answers a JOIN replies r ON r.id = a.reply_id WHERE r.contact_id = ?', [contactId]),
   ])
@@ -110,7 +148,8 @@ export async function thread(contactId: number, s: Settings) {
   for (const r of sends) {
     const mail = await renderEmail({ subject: String(r.subject), html: String(r.html), preheader: String(r.preheader || ''), reason: String(r.reason || '') || reasonFor(String(contact?.list_name || '')) }, person, s)
     messages.push({
-      key: `s${r.id}`, dir: 'out', type: 'campaign', at: Number(r.sent_at), ...me, to: email, subject: mail.subject,
+      key: `s${r.id}`, dir: 'out', type: 'campaign', at: Number(r.sent_at || r.bounced_at), ...me, to: email, subject: mail.subject,
+      note: r.bounced_at ? bounceReason(String(r.last_error || ''), String(r.provider || 'brevo')) : undefined,
       text: mail.text, html: mail.html, campaign: String(r.campaign),
       stats: { delivered: Number(r.delivered_at) || undefined, opened: Number(r.opened_at) || undefined, clicked: Number(r.clicked_at) || undefined, bounced: Number(r.bounced_at) || undefined },
     })
