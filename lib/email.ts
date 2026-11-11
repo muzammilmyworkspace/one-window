@@ -39,12 +39,15 @@ export async function renderEmail(c: { subject: string; html: string; preheader?
   const social = [['Facebook', 'facebook', s.facebook_url], ['Instagram', 'instagram', s.instagram_url], ['Reddit', 'reddit', s.reddit_url]].filter(([, , href]) => href)
     .map(([alt, file, href]) => `<td style="padding-right:8px;"><a href="${esc(href)}"><img src="${assets}/${file}.png" width="24" height="24" alt="${alt}" style="display:block;border:0;font-size:11px;color:#777777;"></a></td>`).join('')
   const site = s.website_url.replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
+  // a plain link, not a button: buttons push an email toward the Promotions tab
+  const callUrl = `${s.website_url.replace(/\/$/, '')}/call`
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#ffffff;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;font-family:Arial,Helvetica,sans-serif;color:#222222;font-size:16px;line-height:1.55;">
 <tr><td height="4" bgcolor="#0E9F6E" style="height:4px;background:#0E9F6E;font-size:0;line-height:0;">&nbsp;</td></tr>
 <tr><td style="padding:16px 16px 4px;"><a href="${esc(s.website_url)}"><img src="${assets}/logo.png" width="132" height="28" alt="${esc(s.brand_name)}" style="display:block;border:0;font-size:14px;color:#222222;"></a></td></tr>
 <tr><td style="padding:14px 16px 2px;">${body}</td></tr>
+<tr><td style="padding:0 16px 10px;"><p style="margin:0;">P.S. Prefer a call? <a href="${esc(callUrl)}" style="color:#0E9F6E;font-weight:bold;">Share your number here</a> and we'll connect you with a licensed agent who calls you.</p></td></tr>
 <tr><td style="padding:4px 16px 2px;">${social ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>${social}<td style="font-size:14px;"><a href="${esc(s.website_url)}" style="color:#0E9F6E;font-weight:bold;text-decoration:none;">${esc(site)}</a></td></tr></table>` : ''}</td></tr>
 <tr><td style="padding:12px 16px 22px;font-size:12px;line-height:1.5;color:#777777;">
 <p style="margin:0 0 6px;border-top:1px solid #e5e5e5;padding-top:12px;">${esc(s.disclosure)}</p>
