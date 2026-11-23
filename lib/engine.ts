@@ -1,4 +1,4 @@
-import { all, batch, getKv, lease, one, release, run, setKv } from './db'
+import { all, batch, getKv, lease, one, release, run, setKv, type Row } from './db'
 import { dailyCapacity, deliver, noteError, noteOk, pickProvider } from './providers'
 import { dayLimit, type PlanContext } from './plan'
 import { TEMPLATES } from './seed'
@@ -74,7 +74,7 @@ export async function attachFollowup(parentId: number, key: string, days: number
 
 /** Queues the follow-up for everyone whose first email is old enough and who has not answered. */
 async function enqueueFollowups() {
-  if (Date.now() - Number((await getKv('followups_last')) || 0) < 5 * 60 * 1000) return
+  if (Date.now() - Number((await getKv('followups_last')) || 0) < 30 * 60 * 1000) return
   await setKv('followups_last', String(Date.now()))
   for (const c of await all("SELECT id, follow_up_of, followup_days FROM campaigns WHERE auto_child = 1 AND status = 'running'")) {
     await run(`INSERT OR IGNORE INTO sends (campaign_id, contact_id, email)
@@ -99,41 +99,43 @@ export async function tick(): Promise<TickResult> {
 
   const settings = await getSettings()
   const gap = Math.max(1, Number(settings.gap_seconds) || 30) * 1000
-  if (isLive() && Date.now() - Number((await getKv('last_sent')) || 0) < gap) {
-    out.running = !!(await one("SELECT 1 x FROM campaigns WHERE status = 'running' LIMIT 1"))
-    out.waiting = 'gap'
-    return out
-  }
+  // Every check below costs database reads, and Turso bills each row read.
+  // So the cheap questions come first, and nothing scans the whole sends table.
+  const running = await all<{ id: number; auto_child: number }>("SELECT id, auto_child FROM campaigns WHERE status = 'running' ORDER BY auto_child DESC, started_at, id")
+  out.running = running.length > 0
+  if (!running.length) return out
+  if (isLive() && Date.now() - Number((await getKv('last_sent')) || 0) < gap) { out.waiting = 'gap'; return out }
+  // practice mode ignores the clock, real emails only go out during the day
+  const hours = isLive() ? openHours(Number(settings.send_from), Number(settings.send_to)) : ''
+  if (hours === null) { out.waiting = 'hours'; return out }
 
-  if (!(await lease('send_lock', 60000))) { out.running = true; out.waiting = 'busy'; return out }
+  if (!(await lease('send_lock', 60000))) { out.waiting = 'busy'; return out }
   try {
     // we hold the only lease, so a row still marked 'sending' was left by a crash
     await run("UPDATE sends SET status = 'queued' WHERE status = 'sending'")
 
     await safetyStop()
     await enqueueFollowups()
-    const held = await heldForBatch()
-    // practice mode ignores the clock, real emails only go out during the day
-    const hours = isLive() ? openHours(Number(settings.send_from), Number(settings.send_to)) : ''
-    if (hours === null) {
-      out.running = !!(await one("SELECT 1 x FROM campaigns WHERE status = 'running' LIMIT 1"))
-      out.waiting = 'hours'
-      return out
-    }
+    const held = new Set(await heldForBatch())
 
-    const next = await one(`SELECT s.id, s.contact_id, s.attempts, ct.email, ct.first_name, ct.last_name, ct.state, ct.status contact_status,
-        ct.company, ct.list_name contact_list, cp.subject, cp.html, cp.preheader, cp.reason
-      FROM sends s JOIN campaigns cp ON cp.id = s.campaign_id JOIN contacts ct ON ct.id = s.contact_id
-      WHERE s.status = 'queued' AND cp.status = 'running'${hours}${held.length ? ` AND cp.id NOT IN (${held.join(',')})` : ''} ORDER BY cp.auto_child DESC, cp.started_at, s.id LIMIT 1`)
+    // campaigns in priority order (follow-ups first, then oldest), each asked for its next email by index
+    let next: Row | undefined
+    for (const c of running) {
+      if (held.has(Number(c.id))) continue
+      next = await one(`SELECT s.id, s.contact_id, s.attempts, ct.email, ct.first_name, ct.last_name, ct.state, ct.status contact_status,
+          ct.company, ct.list_name contact_list, cp.subject, cp.html, cp.preheader, cp.reason
+        FROM sends s JOIN campaigns cp ON cp.id = s.campaign_id JOIN contacts ct ON ct.id = s.contact_id
+        WHERE s.campaign_id = ? AND s.status = 'queued' AND cp.status = 'running'${hours} ORDER BY s.id LIMIT 1`, [Number(c.id)])
+      if (next) break
+    }
     if (!next) {
       await run(`UPDATE campaigns SET status = 'completed', completed_at = ? WHERE status = 'running'
         AND NOT EXISTS (SELECT 1 FROM sends s WHERE s.campaign_id = campaigns.id AND s.status = 'queued')
         AND (auto_child = 0 OR EXISTS (SELECT 1 FROM campaigns p WHERE p.id = campaigns.follow_up_of AND p.status = 'completed'
           AND p.completed_at < ? - campaigns.followup_days * 86400000 - 3600000))`, [Date.now(), Date.now()])
-      if (held.length) { out.running = true; out.waiting = 'batch' }
+      if (held.size) out.waiting = 'batch'
       return out
     }
-    out.running = true
 
     if (next.contact_status !== 'active') {
       await run("UPDATE sends SET status = 'skipped', last_error = ? WHERE id = ?", [`Contact ${next.contact_status}`, next.id])
@@ -189,12 +191,20 @@ export async function planContext(before?: number): Promise<PlanContext> {
 async function heldForBatch(): Promise<number[]> {
   const rows = await all("SELECT id FROM campaigns WHERE status = 'running' AND warmup = 1")
   if (!rows.length) return []
-  const c = await planContext()
-  return c.usedToday >= dayLimit(c.warmDay, c.capacity, true) ? rows.map((r) => Number(r.id)) : []
+  const now = Date.now()
+  const [capacity, first, used] = await Promise.all([
+    dailyCapacity(),
+    one<{ t: number | null }>('SELECT MIN(sent_at) t FROM sends WHERE sent_at IS NOT NULL'),
+    one<{ n: number }>('SELECT COUNT(*) n FROM sends WHERE sent_at > ?', [now - DAY]),
+  ])
+  const warmDay = first?.t ? Math.floor((now - Number(first.t)) / DAY) : 0
+  return Number(used?.n || 0) >= dayLimit(warmDay, capacity, true) ? rows.map((r) => Number(r.id)) : []
 }
 
 /** A list going bad hurts the domain for good, so a running campaign stops itself in time. */
 async function safetyStop() {
+  if (Date.now() - Number((await getKv('safety_last')) || 0) < 15 * 60 * 1000) return
+  await setKv('safety_last', String(Date.now()))
   const rows = await all(`SELECT c.id, c.safety_ack,
       SUM(s.sent_at IS NOT NULL) sent, SUM(s.bounced_at IS NOT NULL) bounced, SUM(s.complained_at IS NOT NULL) complained
     FROM campaigns c JOIN sends s ON s.campaign_id = c.id WHERE c.status = 'running' GROUP BY c.id`)

@@ -32,7 +32,7 @@ function useEngine(setStatus: (s: string) => void) {
       } catch { /* try again on the next beat */ } finally { busy.current = false }
     }
     beat()
-    const id = setInterval(beat, 15000)
+    const id = setInterval(beat, 60000)
     return () => clearInterval(id)
   }, [router, setStatus])
 }

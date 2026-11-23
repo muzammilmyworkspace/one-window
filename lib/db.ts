@@ -70,6 +70,7 @@ CREATE INDEX IF NOT EXISTS replies_time ON replies(received_at);
 CREATE INDEX IF NOT EXISTS replies_contact ON replies(contact_id, kind);
 CREATE INDEX IF NOT EXISTS sends_contact ON sends(contact_id);
 CREATE INDEX IF NOT EXISTS sends_sent ON sends(sent_at);
+CREATE INDEX IF NOT EXISTS sends_next ON sends(campaign_id, status, id);
 
 CREATE TABLE IF NOT EXISTS providers (
   name TEXT PRIMARY KEY,
@@ -108,7 +109,11 @@ const COLUMNS = [
   'ALTER TABLE campaigns ADD COLUMN auto_child INTEGER NOT NULL DEFAULT 0',
   "ALTER TABLE campaigns ADD COLUMN sequence TEXT NOT NULL DEFAULT ''",
   'ALTER TABLE sends ADD COLUMN clicked_at INTEGER',
-  "UPDATE contacts SET status = 'replied' WHERE status = 'active' AND id IN (SELECT contact_id FROM replies WHERE kind = 'reply')",
+]
+
+// One-time data fixes: each runs once, recorded in kv, instead of on every cold start.
+const ONCE: [string, string][] = [
+  ['fix:replied-status', "UPDATE contacts SET status = 'replied' WHERE status = 'active' AND id IN (SELECT contact_id FROM replies WHERE kind = 'reply')"],
 ]
 
 function client(): Client {
@@ -123,6 +128,12 @@ export function ready(): Promise<void> {
     g.__dbReady = (async () => {
       await client().executeMultiple(SCHEMA)
       for (const sql of COLUMNS) await client().execute(sql).catch(() => {})
+      for (const [key, sql] of ONCE) {
+        const done = await client().execute({ sql: 'SELECT 1 FROM kv WHERE key = ?', args: [key] })
+        if (done.rows.length) continue
+        await client().execute(sql)
+        await client().execute({ sql: 'INSERT OR IGNORE INTO kv (key, value) VALUES (?, ?)', args: [key, String(Date.now())] })
+      }
     })().catch((e) => {
       g.__dbReady = undefined
       throw e
